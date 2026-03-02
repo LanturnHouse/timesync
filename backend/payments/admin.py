@@ -13,10 +13,10 @@ class SubscriptionPaymentInline(admin.TabularInline):
 @admin.register(BoostSubscription)
 class BoostSubscriptionAdmin(admin.ModelAdmin):
     list_display = (
-        "group", "user", "plan", "status",
+        "group", "user", "quantity", "status",
         "current_period_end", "cancel_at_period_end", "failed_attempts",
     )
-    list_filter = ("plan", "status", "cancel_at_period_end")
+    list_filter = ("status", "cancel_at_period_end")
     search_fields = ("group__name", "user__email")
     readonly_fields = (
         "billing_key", "customer_key",

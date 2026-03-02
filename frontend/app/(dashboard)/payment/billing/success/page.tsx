@@ -17,11 +17,11 @@ export default function BillingSuccessPage() {
 
   const authKey     = searchParams.get("authKey") ?? "";
   const customerKey = searchParams.get("customerKey") ?? "";
-  const plan        = searchParams.get("plan") ?? "";
+  const quantity    = Number(searchParams.get("quantity") ?? "1");
   const groupId     = searchParams.get("groupId") ?? "";
 
   useEffect(() => {
-    if (!authKey || !customerKey || !plan || !groupId) {
+    if (!authKey || !customerKey || !groupId) {
       setState("error");
       setErrorMessage("결제 정보가 올바르지 않습니다.");
       return;
@@ -31,11 +31,11 @@ export default function BillingSuccessPage() {
     calledRef.current = true;
 
     confirmBilling.mutate(
-      { auth_key: authKey, customer_key: customerKey, plan, group_id: groupId },
+      { auth_key: authKey, customer_key: customerKey, quantity, group_id: groupId },
       {
         onSuccess: () => {
           setState("success");
-          toast.success("구독이 시작되었습니다! 🎉");
+          toast.success(`부스트 ${quantity}개 구독이 시작되었습니다! 🎉`);
           setTimeout(() => router.push(`/groups/${groupId}`), 1500);
         },
         onError: (err) => {
@@ -62,9 +62,7 @@ export default function BillingSuccessPage() {
           <>
             <CheckCircle2 className="mx-auto h-12 w-12 text-green-500" />
             <h1 className="text-xl font-semibold">구독 완료!</h1>
-            <p className="text-sm text-muted-foreground">
-              그룹 페이지로 이동합니다...
-            </p>
+            <p className="text-sm text-muted-foreground">그룹 페이지로 이동합니다...</p>
           </>
         )}
 
@@ -74,13 +72,9 @@ export default function BillingSuccessPage() {
             <h1 className="text-xl font-semibold">구독 처리 실패</h1>
             <p className="text-sm text-muted-foreground">{errorMessage}</p>
             <div className="flex gap-2 justify-center">
-              <Button variant="outline" onClick={() => router.push("/")}>
-                홈으로
-              </Button>
+              <Button variant="outline" onClick={() => router.push("/")}>홈으로</Button>
               {groupId && (
-                <Button onClick={() => router.push(`/groups/${groupId}`)}>
-                  그룹으로 이동
-                </Button>
+                <Button onClick={() => router.push(`/groups/${groupId}`)}>그룹으로 이동</Button>
               )}
             </div>
           </>

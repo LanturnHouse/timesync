@@ -2,14 +2,13 @@ from django.conf import settings
 from django.db import models
 
 from common.models import TimeStampedModel
-from .constants import PLAN_CHOICES
 
 
 class BoostSubscription(TimeStampedModel):
     class StatusChoices(models.TextChoices):
         ACTIVE    = "active",    "Active"
         PAST_DUE  = "past_due",  "Past Due"      # 결제 실패, 3일 유예 중
-        EXPIRED   = "expired",   "Expired"       # 유예 기간 만료 → tier = starter
+        EXPIRED   = "expired",   "Expired"       # 유예 기간 만료
         CANCELLED = "cancelled", "Cancelled"     # 기간 만료 후 취소 확정
 
     user = models.ForeignKey(
@@ -17,12 +16,13 @@ class BoostSubscription(TimeStampedModel):
         on_delete=models.CASCADE,
         related_name="boost_subscriptions",
     )
-    group = models.OneToOneField(
+    group = models.ForeignKey(                   # 그룹당 여러 구독 가능
         "groups.Group",
         on_delete=models.CASCADE,
-        related_name="boost_subscription",
+        related_name="boost_subscriptions",
     )
-    plan = models.CharField(max_length=10, choices=PLAN_CHOICES)
+    quantity = models.PositiveIntegerField(default=1)  # 이 구독이 기여하는 부스트 수
+
     status = models.CharField(
         max_length=10,
         choices=StatusChoices.choices,
@@ -31,19 +31,24 @@ class BoostSubscription(TimeStampedModel):
 
     # Toss Payments
     billing_key  = models.CharField(max_length=200)         # 비공개, 자동 청구용
-    customer_key = models.CharField(max_length=200)         # str(user.id)
+    customer_key = models.CharField(max_length=200)         # 유저+그룹 조합 키
 
     # 구독 기간
     current_period_start = models.DateTimeField()
     current_period_end   = models.DateTimeField()           # 다음 결제일 = 만료일
     cancel_at_period_end = models.BooleanField(default=False)
-    failed_attempts      = models.IntegerField(default=0)   # 연속 결제 실패 횟수
+    failed_attempts      = models.IntegerField(default=0)
 
     class Meta:
         db_table = "boost_subscriptions"
 
     def __str__(self):
-        return f"{self.group.name} — {self.plan} ({self.status})"
+        return f"{self.user.email} → {self.group.name} x{self.quantity} ({self.status})"
+
+    @property
+    def amount(self):
+        from .constants import PER_BOOST_PRICE
+        return PER_BOOST_PRICE * self.quantity
 
 
 class SubscriptionPayment(TimeStampedModel):

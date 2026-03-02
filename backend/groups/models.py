@@ -70,13 +70,13 @@ class Group(TimeStampedModel):
 
     @property
     def computed_tier(self):
-        """구독 기반 tier 계산. 활성 구독이 없으면 starter."""
-        try:
-            sub = self.boost_subscription  # payments.BoostSubscription OneToOne
-            if sub.status == "active":
-                return sub.plan  # "lv1" | "lv2" | "lv3"
-        except Exception:
-            pass
+        """boost_count 기반 tier 계산 (활성 구독들의 quantity 합계)."""
+        if self.boost_count >= 15:
+            return self.TierChoices.LV3
+        elif self.boost_count >= 7:
+            return self.TierChoices.LV2
+        elif self.boost_count >= 3:
+            return self.TierChoices.LV1
         return self.TierChoices.STARTER
 
 

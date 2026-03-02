@@ -45,8 +45,10 @@ export interface BoostSubscription {
   id: string;
   user: string;
   user_email: string;
+  user_display_name: string;
   group: string;
-  plan: "lv1" | "lv2" | "lv3";
+  quantity: number;
+  amount: number;
   status: "active" | "past_due" | "expired" | "cancelled";
   current_period_start: string;
   current_period_end: string;
