@@ -155,3 +155,45 @@ def handle_expired_subscriptions():
         )
 
     return "handle_expired_subscriptions completed"
+
+
+@shared_task
+def process_pending_transfers():
+    """매일 실행. apply_at 이 지난 pending 이동 요청을 처리."""
+    from notifications.utils import notify
+    from .models import BoostTransfer
+
+    now = timezone.now()
+    pending = list(
+        BoostTransfer.objects.filter(status="pending", apply_at__lte=now)
+        .select_related(
+            "subscription", "subscription__group", "subscription__user", "target_group"
+        )
+    )
+
+    count = 0
+    for transfer in pending:
+        sub = transfer.subscription
+        old_group = sub.group
+        new_group = transfer.target_group
+
+        sub.group = new_group
+        sub.save(update_fields=["group"])
+
+        _sync_group_tier(old_group)
+        _sync_group_tier(new_group)
+
+        transfer.status = "completed"
+        transfer.save(update_fields=["status"])
+
+        notify(
+            recipient=sub.user,
+            verb="boost_transferred",
+            description=(
+                f"부스트 {sub.quantity}개가 '{old_group.name}'에서 "
+                f"'{new_group.name}'으로 이동되었습니다."
+            ),
+        )
+        count += 1
+
+    return f"process_pending_transfers: {count} completed"

@@ -2,11 +2,13 @@ from django.urls import path
 
 from .views import (
     CancelSubscriptionView,
+    CancelTransferView,
     ConfirmBillingView,
     MySubscriptionsView,
     PlansView,
     PrepareBillingView,
     SubscriptionListView,
+    TransferBoostView,
 )
 
 urlpatterns = [
@@ -16,4 +18,6 @@ urlpatterns = [
     path("cancel/",            CancelSubscriptionView.as_view(), name="payment-cancel"),
     path("subscriptions/",     SubscriptionListView.as_view(),   name="payment-subscriptions"),
     path("my-subscriptions/",  MySubscriptionsView.as_view(),    name="payment-my-subscriptions"),
+    path("transfer/",          TransferBoostView.as_view(),      name="payment-transfer"),
+    path("cancel-transfer/",   CancelTransferView.as_view(),     name="payment-cancel-transfer"),
 ]

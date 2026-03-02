@@ -13,8 +13,8 @@ from rest_framework.views import APIView
 from groups.models import Group, GroupMember
 
 from .constants import MAX_BOOSTS_PER_SUBSCRIPTION, PER_BOOST_PRICE, TIER_THRESHOLDS
-from .models import BoostSubscription, SubscriptionPayment
-from .serializers import BoostSubscriptionSerializer
+from .models import BoostSubscription, BoostTransfer, SubscriptionPayment
+from .serializers import BoostSubscriptionSerializer, BoostTransferSerializer
 
 
 def _toss_auth_header():
@@ -253,9 +253,103 @@ class MySubscriptionsView(APIView):
         group_id = request.query_params.get("group")
         qs = BoostSubscription.objects.filter(
             user=request.user, status__in=["active", "past_due"]
-        ).select_related("group").prefetch_related("payments").order_by("-created_at")
+        ).select_related("group").prefetch_related("payments", "transfers__target_group").order_by("-created_at")
 
         if group_id:
             qs = qs.filter(group_id=group_id)
 
         return Response(BoostSubscriptionSerializer(qs, many=True).data)
+
+
+class TransferBoostView(APIView):
+    """POST /api/payments/transfer/
+    Body: { subscription_id, target_group_id }
+    부스트를 다른 그룹으로 이동 예약 (3일 후 적용).
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        from datetime import timedelta
+
+        subscription_id = request.data.get("subscription_id")
+        target_group_id = request.data.get("target_group_id")
+
+        if not all([subscription_id, target_group_id]):
+            return Response(
+                {"detail": "subscription_id, target_group_id 는 필수입니다."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            sub = BoostSubscription.objects.select_related("group").get(
+                pk=subscription_id, user=request.user, status="active"
+            )
+        except BoostSubscription.DoesNotExist:
+            return Response({"detail": "활성 구독을 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+
+        # 취소 예약된 구독은 이동 불가
+        if sub.cancel_at_period_end:
+            return Response(
+                {"detail": "취소 예약된 구독은 이동할 수 없습니다."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # 이미 이동 대기 중인지 확인
+        if sub.transfers.filter(status="pending").exists():
+            return Response(
+                {"detail": "이미 이동 대기 중인 부스트입니다."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            target_group = Group.objects.get(pk=target_group_id)
+        except Group.DoesNotExist:
+            return Response({"detail": "대상 그룹을 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+
+        # 같은 그룹으로 이동 불가
+        if str(sub.group_id) == str(target_group.id):
+            return Response(
+                {"detail": "같은 그룹으로는 이동할 수 없습니다."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # 대상 그룹 멤버인지 확인
+        if not _is_member(request.user, target_group):
+            return Response(
+                {"detail": "대상 그룹의 멤버가 아닙니다."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        apply_at = timezone.now() + timedelta(days=3)
+        transfer = BoostTransfer.objects.create(
+            subscription=sub,
+            target_group=target_group,
+            apply_at=apply_at,
+        )
+
+        return Response(BoostTransferSerializer(transfer).data, status=status.HTTP_201_CREATED)
+
+
+class CancelTransferView(APIView):
+    """POST /api/payments/cancel-transfer/
+    Body: { transfer_id }
+    이동 예약 취소.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        transfer_id = request.data.get("transfer_id")
+
+        try:
+            transfer = BoostTransfer.objects.select_related("subscription").get(
+                pk=transfer_id,
+                subscription__user=request.user,
+                status="pending",
+            )
+        except BoostTransfer.DoesNotExist:
+            return Response({"detail": "대기 중인 이동 요청을 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+
+        transfer.status = "cancelled"
+        transfer.save(update_fields=["status"])
+
+        return Response({"message": "이동 예약이 취소되었습니다."})

@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
 import { getAccessToken } from "@/lib/auth";
-import type { BoostSubscription } from "@/types";
+import type { BoostSubscription, BoostTransfer } from "@/types";
 
 function authHeaders() {
   const token = getAccessToken();
@@ -85,6 +85,56 @@ export function useConfirmBilling() {
       queryClient.invalidateQueries({ queryKey: ["subscriptions", variables.group_id] });
       queryClient.invalidateQueries({ queryKey: ["my-subscriptions", variables.group_id] });
       queryClient.invalidateQueries({ queryKey: ["groups"] });
+    },
+  });
+}
+
+/** GET /api/payments/my-subscriptions/ — 내 전체 구독 (그룹 필터 없음, 설정 페이지용) */
+export function useAllMySubscriptions() {
+  return useQuery({
+    queryKey: ["my-subscriptions-all"],
+    queryFn: () =>
+      apiFetch<BoostSubscription[]>("/payments/my-subscriptions/", authHeaders()),
+  });
+}
+
+/** POST /api/payments/transfer/ — 부스트를 다른 그룹으로 이동 예약 (3일 후 적용) */
+export function useTransferBoost() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      subscriptionId,
+      targetGroupId,
+    }: {
+      subscriptionId: string;
+      targetGroupId: string;
+    }) =>
+      apiFetch<BoostTransfer>("/payments/transfer/", {
+        method: "POST",
+        body: JSON.stringify({
+          subscription_id: subscriptionId,
+          target_group_id: targetGroupId,
+        }),
+        ...authHeaders(),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["my-subscriptions-all"] });
+    },
+  });
+}
+
+/** POST /api/payments/cancel-transfer/ — 이동 예약 취소 */
+export function useCancelTransfer() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (transferId: string) =>
+      apiFetch<{ message: string }>("/payments/cancel-transfer/", {
+        method: "POST",
+        body: JSON.stringify({ transfer_id: transferId }),
+        ...authHeaders(),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["my-subscriptions-all"] });
     },
   });
 }

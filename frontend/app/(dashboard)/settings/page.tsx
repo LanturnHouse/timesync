@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -21,9 +22,15 @@ import {
   useProfile,
   useUpdateProfile,
 } from "@/hooks/use-settings";
+import {
+  useAllMySubscriptions,
+  useCancelTransfer,
+} from "@/hooks/use-subscriptions";
+import { BoostTransferDialog } from "@/components/groups/boost-transfer-dialog";
 import { useTheme } from "next-themes";
-import { Moon, Sun, Monitor } from "lucide-react";
+import { AlertTriangle, ArrowRight, Clock, Moon, Sun, Monitor, Zap } from "lucide-react";
 import { toast } from "sonner";
+import type { BoostSubscription } from "@/types";
 
 const TIMEZONES = [
   "UTC",
@@ -45,11 +52,14 @@ export default function SettingsPage() {
   const updateSettings = useUpdateUserSettings();
   const { data: profile, isLoading: profileLoading } = useProfile();
   const updateProfile = useUpdateProfile();
+  const { data: mySubscriptions = [], isLoading: subsLoading } = useAllMySubscriptions();
+  const cancelTransfer = useCancelTransfer();
   const { theme, setTheme } = useTheme();
 
   const [displayName, setDisplayName] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
   const [timezone, setTimezone] = useState("UTC");
+  const [transferTarget, setTransferTarget] = useState<BoostSubscription | null>(null);
 
   useEffect(() => {
     if (profile) {
@@ -263,7 +273,153 @@ export default function SettingsPage() {
             />
           </div>
         </div>
+
+        <Separator />
+
+        {/* ── 내 부스트 ── */}
+        <div className="space-y-4">
+          <div>
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+              내 부스트
+            </h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              현재 구독 중인 부스트 현황입니다. 다른 그룹으로 이동할 수 있습니다.
+            </p>
+          </div>
+
+          {subsLoading ? (
+            <div className="space-y-2">
+              {Array.from({ length: 2 }).map((_, i) => (
+                <Skeleton key={i} className="h-16 rounded-lg" />
+              ))}
+            </div>
+          ) : mySubscriptions.length === 0 ? (
+            <p className="text-sm text-muted-foreground rounded-lg border border-dashed p-4 text-center">
+              활성 부스트 구독이 없습니다.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {mySubscriptions.map((sub) => (
+                <MyBoostRow
+                  key={sub.id}
+                  subscription={sub}
+                  onTransfer={() => setTransferTarget(sub)}
+                  onCancelTransfer={(transferId) =>
+                    cancelTransfer.mutate(transferId, {
+                      onSuccess: () => toast.success("이동 예약이 취소되었습니다."),
+                      onError: (err) =>
+                        toast.error(err instanceof Error ? err.message : "오류가 발생했습니다."),
+                    })
+                  }
+                  cancelTransferPending={cancelTransfer.isPending}
+                />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* 부스트 이동 Dialog */}
+      {transferTarget && (
+        <BoostTransferDialog
+          open={!!transferTarget}
+          onOpenChange={(open) => !open && setTransferTarget(null)}
+          subscription={transferTarget}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── 내 부스트 행 컴포넌트 ─────────────────────────────────────────────────────
+interface MyBoostRowProps {
+  subscription: BoostSubscription;
+  onTransfer: () => void;
+  onCancelTransfer: (transferId: string) => void;
+  cancelTransferPending: boolean;
+}
+
+function MyBoostRow({
+  subscription,
+  onTransfer,
+  onCancelTransfer,
+  cancelTransferPending,
+}: MyBoostRowProps) {
+  const renewalDate = new Date(subscription.current_period_end).toLocaleDateString("ko-KR");
+  const transfer = subscription.pending_transfer;
+
+  return (
+    <div className="rounded-lg border p-3 space-y-2">
+      {/* 상단: 그룹명 + 뱃지 + 부스트 수 */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <Zap className="h-4 w-4 text-yellow-500 shrink-0" />
+          <span className="font-medium text-sm truncate">{subscription.group_name}</span>
+          {subscription.status === "past_due" && (
+            <Badge variant="destructive" className="text-xs h-4 shrink-0">결제 실패</Badge>
+          )}
+        </div>
+        <span className="text-sm font-semibold shrink-0">
+          {subscription.quantity}개
+        </span>
+      </div>
+
+      {/* 하단: 금액 + 다음 결제일 + 이동 버튼 */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-xs text-muted-foreground space-y-0.5">
+          <p>₩{subscription.amount.toLocaleString()}/월</p>
+          <p className="flex items-center gap-1">
+            <Clock className="h-3 w-3" />
+            {subscription.cancel_at_period_end
+              ? `${renewalDate}에 종료 예정`
+              : `다음 결제: ${renewalDate}`}
+          </p>
+        </div>
+
+        {/* 이동 예약 중이면 이동 예약 정보 + 취소 버튼 표시 */}
+        {transfer ? (
+          <div className="flex items-center gap-2 text-xs text-right">
+            <div className="text-muted-foreground">
+              <span className="flex items-center gap-1 text-orange-500 font-medium">
+                <ArrowRight className="h-3 w-3" />
+                {transfer.target_group_name}
+              </span>
+              <span className="text-xs">
+                {new Date(transfer.apply_at).toLocaleDateString("ko-KR")} 적용
+              </span>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs text-muted-foreground hover:text-destructive shrink-0"
+              onClick={() => onCancelTransfer(transfer.id)}
+              disabled={cancelTransferPending}
+            >
+              취소
+            </Button>
+          </div>
+        ) : !subscription.cancel_at_period_end && subscription.status === "active" ? (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 text-xs shrink-0"
+            onClick={onTransfer}
+          >
+            <ArrowRight className="mr-1 h-3 w-3" />
+            이동
+          </Button>
+        ) : null}
+      </div>
+
+      {/* 이동 예약 중 안내 배너 */}
+      {transfer && (
+        <div className="flex items-center gap-1.5 rounded bg-orange-50 dark:bg-orange-950/20 px-2 py-1.5 text-xs text-orange-600 dark:text-orange-400">
+          <AlertTriangle className="h-3 w-3 shrink-0" />
+          <span>
+            3일 후 <strong>{transfer.target_group_name}</strong>으로 이동 예약됨
+          </span>
+        </div>
+      )}
     </div>
   );
 }

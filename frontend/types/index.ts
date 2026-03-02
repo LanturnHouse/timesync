@@ -41,12 +41,23 @@ export interface SubscriptionPaymentRecord {
   created_at: string;
 }
 
+export interface BoostTransfer {
+  id: string;
+  status: "pending" | "completed" | "cancelled";
+  apply_at: string;
+  source_group_name: string;
+  target_group_name: string;
+  target_group_id: string;
+  created_at: string;
+}
+
 export interface BoostSubscription {
   id: string;
   user: string;
   user_email: string;
   user_display_name: string;
   group: string;
+  group_name: string;
   quantity: number;
   amount: number;
   status: "active" | "past_due" | "expired" | "cancelled";
@@ -54,6 +65,7 @@ export interface BoostSubscription {
   current_period_end: string;
   cancel_at_period_end: boolean;
   failed_attempts: number;
+  pending_transfer: BoostTransfer | null;
   payments: SubscriptionPaymentRecord[];
   created_at: string;
 }

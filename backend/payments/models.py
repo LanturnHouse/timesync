@@ -51,6 +51,42 @@ class BoostSubscription(TimeStampedModel):
         return PER_BOOST_PRICE * self.quantity
 
 
+class BoostTransfer(TimeStampedModel):
+    """부스트 구독을 다른 그룹으로 이동하는 3일 지연 이동 요청."""
+
+    class StatusChoices(models.TextChoices):
+        PENDING   = "pending",   "Pending"
+        COMPLETED = "completed", "Completed"
+        CANCELLED = "cancelled", "Cancelled"
+
+    subscription = models.ForeignKey(
+        BoostSubscription,
+        on_delete=models.CASCADE,
+        related_name="transfers",
+    )
+    target_group = models.ForeignKey(
+        "groups.Group",
+        on_delete=models.CASCADE,
+        related_name="incoming_transfers",
+    )
+    status   = models.CharField(
+        max_length=10,
+        choices=StatusChoices.choices,
+        default=StatusChoices.PENDING,
+    )
+    apply_at = models.DateTimeField()   # created_at + 3일
+
+    class Meta:
+        db_table = "boost_transfers"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return (
+            f"Transfer {self.subscription} → {self.target_group.name} "
+            f"@ {self.apply_at} [{self.status}]"
+        )
+
+
 class SubscriptionPayment(TimeStampedModel):
     class StatusChoices(models.TextChoices):
         SUCCESS = "success", "Success"
