@@ -42,7 +42,7 @@ export function SubscriptionDialog({
   const prepareBilling = usePrepareBilling();
 
   const perBoostPrice = plans?.per_boost_price ?? 1900;
-  const maxQty = plans?.max_quantity ?? 10;
+  const maxQty = plans?.max_quantity ?? 15;
   const totalAmount = perBoostPrice * quantity;
   const projectedTotal = currentBoostCount + quantity;
 
