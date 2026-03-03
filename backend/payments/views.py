@@ -239,7 +239,7 @@ class SubscriptionListView(APIView):
             BoostSubscription.objects
             .filter(group=group, status__in=["active", "past_due"])
             .select_related("user")
-            .prefetch_related("payments")
+            .prefetch_related("payments", "transfers__target_group")
             .order_by("-created_at")
         )
         return Response(BoostSubscriptionSerializer(subs, many=True).data)

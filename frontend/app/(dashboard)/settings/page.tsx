@@ -348,6 +348,10 @@ function MyBoostRow({
   const renewalDate = new Date(subscription.current_period_end).toLocaleDateString("ko-KR");
   const transfer = subscription.pending_transfer;
 
+  const transferDaysLeft = transfer
+    ? Math.max(0, Math.ceil((new Date(transfer.apply_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+    : 0;
+
   return (
     <div className="rounded-lg border p-3 space-y-2">
       {/* 상단: 그룹명 + 뱃지 + 부스트 수 */}
@@ -416,7 +420,8 @@ function MyBoostRow({
         <div className="flex items-center gap-1.5 rounded bg-orange-50 dark:bg-orange-950/20 px-2 py-1.5 text-xs text-orange-600 dark:text-orange-400">
           <AlertTriangle className="h-3 w-3 shrink-0" />
           <span>
-            3일 후 <strong>{transfer.target_group_name}</strong>으로 이동 예약됨
+            {transferDaysLeft > 0 ? `${transferDaysLeft}일 후` : "오늘"}{" "}
+            <strong>{transfer.target_group_name}</strong>으로 이동 예약됨
           </span>
         </div>
       )}

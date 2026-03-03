@@ -84,6 +84,7 @@ export function useConfirmBilling() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["subscriptions", variables.group_id] });
       queryClient.invalidateQueries({ queryKey: ["my-subscriptions", variables.group_id] });
+      queryClient.invalidateQueries({ queryKey: ["my-subscriptions-all"] });
       queryClient.invalidateQueries({ queryKey: ["groups"] });
     },
   });
@@ -152,6 +153,7 @@ export function useCancelSubscription() {
     onSuccess: (_, { groupId }) => {
       queryClient.invalidateQueries({ queryKey: ["subscriptions", groupId] });
       queryClient.invalidateQueries({ queryKey: ["my-subscriptions", groupId] });
+      queryClient.invalidateQueries({ queryKey: ["my-subscriptions-all"] });
     },
   });
 }
