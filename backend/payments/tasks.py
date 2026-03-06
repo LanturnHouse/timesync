@@ -75,7 +75,7 @@ def _charge_subscription(sub):
         notify(
             recipient=sub.user,
             verb="subscription_renewed",
-            description=f"'{sub.group.name}' 부스트 {sub.quantity}개 구독이 갱신되었습니다.",
+            message=f"'{sub.group.name}' 부스트 {sub.quantity}개 구독이 갱신되었습니다.",
         )
     else:
         toss_resp = resp.json() if resp is not None else {}
@@ -94,7 +94,7 @@ def _charge_subscription(sub):
         notify(
             recipient=sub.user,
             verb="subscription_payment_failed",
-            description=(
+            message=(
                 f"'{sub.group.name}' 부스트 구독 결제에 실패했습니다. "
                 "3일 내에 카드 정보를 확인해주세요."
             ),
@@ -127,7 +127,7 @@ def charge_due_subscriptions():
         notify(
             recipient=sub.user,
             verb="subscription_cancelled",
-            description=f"'{sub.group.name}' 부스트 {sub.quantity}개 구독이 종료되었습니다.",
+            message=f"'{sub.group.name}' 부스트 {sub.quantity}개 구독이 종료되었습니다.",
         )
 
     return f"charge_due_subscriptions completed for date={today}"
@@ -151,7 +151,7 @@ def handle_expired_subscriptions():
         notify(
             recipient=sub.user,
             verb="subscription_expired",
-            description=f"'{sub.group.name}' 부스트 {sub.quantity}개 구독이 만료되었습니다.",
+            message=f"'{sub.group.name}' 부스트 {sub.quantity}개 구독이 만료되었습니다.",
         )
 
     return "handle_expired_subscriptions completed"
@@ -189,7 +189,7 @@ def process_pending_transfers():
         notify(
             recipient=sub.user,
             verb="boost_transferred",
-            description=(
+            message=(
                 f"부스트 {sub.quantity}개가 '{old_group.name}'에서 "
                 f"'{new_group.name}'으로 이동되었습니다."
             ),

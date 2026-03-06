@@ -119,6 +119,8 @@ export function useTransferBoost() {
         ...authHeaders(),
       }),
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["subscriptions"] });
+      queryClient.invalidateQueries({ queryKey: ["my-subscriptions"] });
       queryClient.invalidateQueries({ queryKey: ["my-subscriptions-all"] });
     },
   });
@@ -135,6 +137,8 @@ export function useCancelTransfer() {
         ...authHeaders(),
       }),
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["subscriptions"] });
+      queryClient.invalidateQueries({ queryKey: ["my-subscriptions"] });
       queryClient.invalidateQueries({ queryKey: ["my-subscriptions-all"] });
     },
   });
