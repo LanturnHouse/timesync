@@ -525,6 +525,81 @@ class EventViewSet(viewsets.ModelViewSet):
             status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
         )
 
+    @action(detail=True, methods=["get"])
+    def suggest(self, request, pk=None):
+        """Generate AI suggestions for an event using Claude."""
+        from django.conf import settings as django_settings
+
+        try:
+            import anthropic as anthropic_sdk
+        except ImportError:
+            return Response(
+                {"detail": "AI suggestions feature is not available."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        api_key = getattr(django_settings, "ANTHROPIC_API_KEY", "")
+        if not api_key:
+            return Response({"suggestions": "AI 추천 기능이 설정되지 않았습니다."})
+
+        event = self.get_object()
+
+        # Compute duration
+        duration_minutes = int((event.end_at - event.start_at).total_seconds() / 60)
+        duration_str = (
+            f"{duration_minutes // 60}시간 {duration_minutes % 60}분"
+            if duration_minutes >= 60
+            else f"{duration_minutes}분"
+        )
+
+        # Build RSVP summary
+        rsvp_counts = event.rsvp_counts if hasattr(event, "rsvp_counts") else {}
+        if not rsvp_counts:
+            from .models import EventRSVP
+            counts = EventRSVP.objects.filter(event=event).values("status").annotate(
+                count=models.Count("status")
+            )
+            rsvp_counts = {row["status"]: row["count"] for row in counts}
+
+        accepted = rsvp_counts.get("accepted", 0)
+        tentative = rsvp_counts.get("tentative", 0)
+        declined = rsvp_counts.get("declined", 0)
+
+        # Build context lines
+        context_lines = [
+            f"이벤트 제목: {event.title}",
+            f"카테고리: {event.category or '없음'}",
+            f"시작: {event.start_at.strftime('%Y-%m-%d %H:%M')} (UTC)",
+            f"종료: {event.end_at.strftime('%Y-%m-%d %H:%M')} (UTC)",
+            f"소요 시간: {duration_str}",
+        ]
+        if event.description:
+            context_lines.append(f"설명: {event.description}")
+        if event.group:
+            context_lines.append(f"그룹: {event.group.name}")
+        context_lines.append(f"RSVP 현황 — 수락: {accepted}, 미정: {tentative}, 불가: {declined}")
+
+        prompt = (
+            "다음 일정 정보를 바탕으로 이 이벤트를 더 잘 진행하기 위한 실용적인 추천사항을 "
+            "3~5개 번호 목록으로 알려주세요. 한국어로 답변해 주세요.\n\n"
+            + "\n".join(context_lines)
+        )
+
+        try:
+            client = anthropic_sdk.Anthropic(api_key=api_key)
+            message = client.messages.create(
+                model="claude-opus-4-6",
+                max_tokens=600,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            suggestions_text = message.content[0].text
+            return Response({"suggestions": suggestions_text, "event_id": str(event.id)})
+        except Exception as exc:
+            return Response(
+                {"detail": f"AI 추천 생성에 실패했습니다: {str(exc)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
     @action(detail=False, methods=["get"])
     def availability(self, request):
         """

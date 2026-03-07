@@ -31,6 +31,9 @@ django-celery-beat>=2.6,<3.0
 # Recurring events
 python-dateutil>=2.9,<3.0
 
+# AI
+anthropic>=0.40,<1.0
+
 # Development
 pytest-django>=4.8,<5.0
 factory-boy>=3.3,<4.0

@@ -195,6 +195,20 @@ export function useRSVP() {
   });
 }
 
+export function useEventSuggestions(eventId: string | null) {
+  return useQuery({
+    queryKey: ["events", eventId, "suggestions"],
+    queryFn: () =>
+      apiFetch<{ suggestions: string; event_id: string }>(
+        `/events/${eventId}/suggest/`,
+        authHeaders(),
+      ),
+    enabled: false, // Only fetch on demand via refetch()
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    retry: false,
+  });
+}
+
 export function useAvailability(
   groupId?: string,
   start?: string,
