@@ -107,7 +107,7 @@ export function BoostHistory({
   tier,
   memberCount = 0,
   maxMembers,
-  isAdmin: _isAdmin = false,
+
   groupName = "그룹",
 }: BoostHistoryProps) {
   const [showSubscribeDialog, setShowSubscribeDialog] = useState(false);
