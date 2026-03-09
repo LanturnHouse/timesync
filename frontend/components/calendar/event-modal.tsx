@@ -542,7 +542,7 @@ function EventFormFields({
   );
 }
 
-// ── View Mode: 3-panel detail view ─────────────────────────────────────────
+// ── View Mode: detail view ──────────────────────────────────────────────────
 
 function EventDetailView({
   event,
@@ -570,11 +570,10 @@ function EventDetailView({
   const suggestions = useEventSuggestions(eventId);
 
   const startDate = event.start_at ? new Date(event.start_at) : null;
-  const endDate = event.end_at ? new Date(event.end_at) : null;
+  const endDate   = event.end_at   ? new Date(event.end_at)   : null;
 
   const isSameDay =
-    startDate &&
-    endDate &&
+    startDate && endDate &&
     format(startDate, "yyyy-MM-dd") === format(endDate, "yyyy-MM-dd");
 
   const dateStr = startDate
@@ -587,24 +586,25 @@ function EventDetailView({
     ? `${format(startDate, "HH:mm")} – ${format(endDate!, "HH:mm")}`
     : "";
 
-  const accepted = event.rsvp_counts?.accepted ?? 0;
+  const accepted  = event.rsvp_counts?.accepted  ?? 0;
   const tentative = event.rsvp_counts?.tentative ?? 0;
-  const declined = event.rsvp_counts?.declined ?? 0;
+  const declined  = event.rsvp_counts?.declined  ?? 0;
 
   return (
-    <DialogContent className="sm:max-w-5xl h-[88vh] flex flex-col p-0 gap-0 overflow-hidden [&>button:last-child]:hidden">
-      {/* Header */}
+    <DialogContent className="sm:max-w-5xl h-[85vh] flex flex-col p-0 gap-0 overflow-hidden [&>button:last-child]:hidden">
+
+      {/* ── HEADER ── */}
       <DialogHeader className="px-6 py-4 border-b shrink-0">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-3 min-w-0">
             {event.color && (
               <div
-                className="mt-1 h-4 w-4 shrink-0 rounded-full"
+                className="mt-1.5 h-3.5 w-3.5 shrink-0 rounded-full"
                 style={{ backgroundColor: event.color }}
               />
             )}
             <div className="min-w-0">
-              <DialogTitle className="text-xl font-semibold leading-tight truncate">
+              <DialogTitle className="text-xl font-semibold leading-tight">
                 {event.title}
               </DialogTitle>
               <div className="flex items-center gap-2 mt-1 flex-wrap">
@@ -642,60 +642,58 @@ function EventDetailView({
         </div>
       </DialogHeader>
 
-      {/* Body: Left + Right */}
-      <div className="flex-1 min-h-0 grid grid-cols-[2fr_3fr] divide-x overflow-hidden">
+      {/* ── BODY ── */}
+      <div className="flex-1 min-h-0 grid grid-cols-[240px_1fr] divide-x overflow-hidden">
 
-        {/* ── LEFT PANEL ── */}
-        <div className="overflow-y-auto p-6 space-y-6">
+        {/* ── LEFT: compact info ── */}
+        <div className="flex flex-col overflow-y-auto p-5 gap-5">
 
           {/* Date & Time */}
           <div className="space-y-1.5">
             <div className="flex items-center gap-2 text-sm">
               <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
-              <span>{dateStr}</span>
+              <span className="font-medium">{dateStr}</span>
             </div>
-            <div className="flex items-center gap-2 text-sm">
-              <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
+            <div className="flex items-center gap-2 text-sm text-muted-foreground pl-6">
+              <Clock className="h-3.5 w-3.5 shrink-0" />
               <span>{timeStr}</span>
             </div>
           </div>
 
           {/* Description */}
           {event.description && (
-            <div className="space-y-1">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">설명</p>
-              <p className="text-sm leading-relaxed whitespace-pre-wrap">{event.description}</p>
-            </div>
+            <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap border-l-2 border-muted pl-3">
+              {event.description}
+            </p>
           )}
 
-          {/* RSVP counts */}
-          <div className="space-y-2">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">참석 현황</p>
-            <div className="grid grid-cols-3 gap-2">
-              <div className="rounded-lg border p-3 text-center">
-                <p className="text-2xl font-bold text-green-600 dark:text-green-400">{accepted}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">수락</p>
-              </div>
-              <div className="rounded-lg border p-3 text-center">
-                <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{tentative}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">미정</p>
-              </div>
-              <div className="rounded-lg border p-3 text-center">
-                <p className="text-2xl font-bold text-red-600 dark:text-red-400">{declined}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">불가</p>
-              </div>
-            </div>
+          {/* RSVP 현황 — compact inline */}
+          <div className="flex items-center gap-3 text-sm">
+            <span className="flex items-center gap-1 font-medium text-green-600 dark:text-green-400">
+              <span className="text-base font-bold">{accepted}</span>
+              <span className="text-xs text-muted-foreground font-normal">수락</span>
+            </span>
+            <span className="text-border">·</span>
+            <span className="flex items-center gap-1 font-medium text-amber-600 dark:text-amber-400">
+              <span className="text-base font-bold">{tentative}</span>
+              <span className="text-xs text-muted-foreground font-normal">미정</span>
+            </span>
+            <span className="text-border">·</span>
+            <span className="flex items-center gap-1 font-medium text-red-600 dark:text-red-400">
+              <span className="text-base font-bold">{declined}</span>
+              <span className="text-xs text-muted-foreground font-normal">불가</span>
+            </span>
           </div>
 
-          {/* My RSVP */}
-          <div className="space-y-2">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">내 응답</p>
-            <div className="flex gap-2">
+          {/* 내 응답 */}
+          <div className="space-y-1.5">
+            <p className="text-xs text-muted-foreground">내 응답</p>
+            <div className="flex gap-1.5">
               {(
                 [
-                  { status: "accepted", label: "참여", activeClass: "bg-green-500 hover:bg-green-600 text-white border-green-500" },
+                  { status: "accepted",  label: "참여", activeClass: "bg-green-500 hover:bg-green-600 text-white border-green-500" },
                   { status: "tentative", label: "미정", activeClass: "bg-amber-500 hover:bg-amber-600 text-white border-amber-500" },
-                  { status: "declined", label: "불가", activeClass: "bg-red-500 hover:bg-red-600 text-white border-red-500" },
+                  { status: "declined",  label: "불가", activeClass: "bg-red-500   hover:bg-red-600   text-white border-red-500"   },
                 ] as const
               ).map(({ status, label, activeClass }) => {
                 const isCurrent = event.my_rsvp_status === status;
@@ -704,7 +702,7 @@ function EventDetailView({
                     key={status}
                     variant={isCurrent ? "default" : "outline"}
                     size="sm"
-                    className={isCurrent ? activeClass : ""}
+                    className={`h-7 px-2.5 text-xs ${isCurrent ? activeClass : ""}`}
                     disabled={rsvp.isPending}
                     onClick={() =>
                       rsvp.mutate(
@@ -724,46 +722,51 @@ function EventDetailView({
             </div>
           </div>
 
-          {/* Creator actions */}
+          {/* 관리 (creator) */}
           {isCreator && (
-            <div className="space-y-2 pt-2 border-t">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">관리</p>
-              <div className="flex flex-wrap gap-2">
+            <div className="pt-3 border-t space-y-1.5 mt-auto">
+              <p className="text-xs text-muted-foreground">관리</p>
+              <div className="flex flex-wrap gap-1.5">
                 {!event.is_template && (
                   <Button
                     variant="outline"
                     size="sm"
+                    className="h-7 px-2.5 text-xs"
                     disabled={saveAsTemplate.isPending}
                     onClick={onSaveTemplate}
                   >
-                    <BookCopy className="mr-1.5 h-3.5 w-3.5" />
-                    템플릿 저장
+                    <BookCopy className="mr-1 h-3 w-3" />
+                    템플릿
                   </Button>
                 )}
                 <Button
                   variant="outline"
                   size="sm"
+                  className="h-7 px-2.5 text-xs"
                   onClick={() =>
                     downloadIcal(eventId, `${event.title ?? "event"}.ics`).catch(
                       (err) => toast.error(err.message)
                     )
                   }
                 >
-                  <Download className="mr-1.5 h-3.5 w-3.5" />
+                  <Download className="mr-1 h-3 w-3" />
                   .ics
                 </Button>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
-                    <Button variant="destructive" size="sm" disabled={deleteEvent.isPending}>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="h-7 px-2.5 text-xs"
+                      disabled={deleteEvent.isPending}
+                    >
                       삭제
                     </Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
                       <AlertDialogTitle>이벤트를 삭제할까요?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        이 작업은 되돌릴 수 없습니다.
-                      </AlertDialogDescription>
+                      <AlertDialogDescription>이 작업은 되돌릴 수 없습니다.</AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                       <AlertDialogCancel>취소</AlertDialogCancel>
@@ -776,37 +779,31 @@ function EventDetailView({
           )}
         </div>
 
-        {/* ── RIGHT PANEL ── */}
+        {/* ── RIGHT: AI + Comments ── */}
         <div className="flex flex-col overflow-hidden">
 
-          {/* AI Suggestions (top half) */}
-          <div className="flex-1 flex flex-col overflow-hidden border-b p-5">
-            <div className="flex items-center justify-between mb-3 shrink-0">
-              <div className="flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-violet-500" />
+          {/* AI 추천 */}
+          <div className="flex flex-col overflow-hidden border-b" style={{ flex: "0 0 38%" }}>
+            <div className="flex items-center justify-between px-5 pt-4 pb-3 shrink-0">
+              <div className="flex items-center gap-1.5">
+                <Sparkles className="h-3.5 w-3.5 text-violet-500" />
                 <span className="text-sm font-medium">AI 추천</span>
               </div>
               <Button
                 variant="outline"
                 size="sm"
+                className="h-7 px-2.5 text-xs"
                 disabled={suggestions.isFetching}
                 onClick={() => suggestions.refetch()}
               >
                 {suggestions.isFetching ? (
-                  <>
-                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                    분석 중…
-                  </>
+                  <><Loader2 className="mr-1 h-3 w-3 animate-spin" />분석 중…</>
                 ) : (
-                  <>
-                    <Sparkles className="mr-1.5 h-3.5 w-3.5" />
-                    추천 받기
-                  </>
+                  <><Sparkles className="mr-1 h-3 w-3" />추천 받기</>
                 )}
               </Button>
             </div>
-
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto px-5 pb-4">
               {suggestions.isError && (
                 <p className="text-sm text-destructive">
                   {(suggestions.error as any)?.message ?? "AI 추천을 불러오지 못했습니다."}
@@ -818,18 +815,16 @@ function EventDetailView({
                 </p>
               ) : !suggestions.isFetching ? (
                 <p className="text-sm text-muted-foreground">
-                  이벤트를 더 잘 준비할 수 있도록 Claude AI가 추천을 제공합니다.
-                  <br />
-                  위의 버튼을 눌러 추천을 받아보세요.
+                  Claude AI가 이벤트 준비를 도와드립니다. 위 버튼을 눌러 추천을 받아보세요.
                 </p>
               ) : null}
             </div>
           </div>
 
-          {/* Comments / Log (bottom half) */}
-          <div className="flex-1 flex flex-col overflow-hidden p-5">
-            <p className="text-sm font-medium mb-3 shrink-0">댓글 / 로그</p>
-            <div className="flex-1 overflow-hidden">
+          {/* 댓글 */}
+          <div className="flex flex-col overflow-hidden flex-1">
+            <p className="text-sm font-medium px-5 pt-4 pb-2 shrink-0">댓글 / 로그</p>
+            <div className="flex-1 overflow-hidden px-5 pb-4">
               <CommentSection eventId={eventId} />
             </div>
           </div>
