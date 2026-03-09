@@ -588,7 +588,7 @@ class EventViewSet(viewsets.ModelViewSet):
         try:
             client = google_genai.Client(api_key=api_key)
             response = client.models.generate_content(
-                model="gemini-2.0-flash",
+                model="gemini-1.5-flash",
                 contents=prompt,
             )
             suggestions_text = response.text

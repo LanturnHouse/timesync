@@ -651,145 +651,145 @@ function EventDetailView({
         </div>
       </div>
 
-      {/* ── BODY: 좌(이벤트 정보 전체) / 우(AI 상단 + 댓글 하단) ── */}
-      <div className="flex-1 min-h-0 overflow-hidden grid grid-cols-[1fr_320px] divide-x">
+      {/* ── BODY: 상단(정보 좌 + AI 우) / 하단(댓글 전체너비) ── */}
+      <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
 
-        {/* ══ 좌: 이벤트 정보 (전체 높이, 스크롤) ══ */}
-        <div className="overflow-y-auto p-6 flex flex-col gap-5">
+        {/* ══ 상단: 이벤트 정보(좌) + Gemini AI(우) ══ */}
+        <div className="flex-[0_0_58%] grid grid-cols-[1fr_260px] divide-x border-b overflow-hidden">
 
-          {/* 날짜 & 시간 */}
-          <div className="flex items-start gap-3">
-            <div className="h-10 w-10 rounded-xl bg-muted flex items-center justify-center shrink-0">
-              <Calendar className="h-5 w-5 text-muted-foreground" />
+          {/* 좌: 이벤트 정보 (넓고, 스크롤 가능) */}
+          <div className="overflow-y-auto p-6 flex flex-col gap-5">
+
+            {/* 날짜 & 시간 */}
+            <div className="flex items-start gap-3">
+              <div className="h-10 w-10 rounded-xl bg-muted flex items-center justify-center shrink-0">
+                <Calendar className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <div className="pt-0.5">
+                <p className="text-base font-semibold">{dateStr}</p>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  {timeStr}
+                  {durationMinutes > 0 && (
+                    <span className="ml-2 text-muted-foreground/60 text-xs">({durationStr})</span>
+                  )}
+                </p>
+              </div>
             </div>
-            <div className="pt-0.5">
-              <p className="text-base font-semibold">{dateStr}</p>
-              <p className="text-sm text-muted-foreground mt-0.5">
-                {timeStr}
-                {durationMinutes > 0 && (
-                  <span className="ml-2 text-muted-foreground/60 text-xs">({durationStr})</span>
-                )}
-              </p>
+
+            {/* 설명 */}
+            {event.description && (
+              <div className="rounded-xl bg-muted/50 px-4 py-3.5">
+                <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                  {event.description}
+                </p>
+              </div>
+            )}
+
+            {/* 구분선 */}
+            <div className="h-px bg-border" />
+
+            {/* 참석 현황 */}
+            <div className="space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">참석 현황</p>
+              <div className="flex items-center gap-6">
+                {[
+                  { count: accepted,  label: "수락", color: "bg-emerald-500" },
+                  { count: tentative, label: "미정", color: "bg-amber-500"   },
+                  { count: declined,  label: "불가", color: "bg-red-500"     },
+                ].map(({ count, label, color }) => (
+                  <div key={label} className="flex items-center gap-2">
+                    <div className={`h-2.5 w-2.5 rounded-full ${color}`} />
+                    <span className="text-sm font-bold tabular-nums">{count}</span>
+                    <span className="text-xs text-muted-foreground">{label}</span>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
 
-          {/* 설명 */}
-          {event.description && (
-            <div className="rounded-xl bg-muted/50 px-4 py-3.5">
-              <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
-                {event.description}
-              </p>
+            {/* 내 응답 */}
+            <div className="space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">내 응답</p>
+              <div className="grid grid-cols-3 gap-2">
+                {(
+                  [
+                    { status: "accepted",  label: "✓ 참여", sel: "bg-emerald-500 hover:bg-emerald-600 text-white border-emerald-500" },
+                    { status: "tentative", label: "? 미정", sel: "bg-amber-500   hover:bg-amber-600   text-white border-amber-500"   },
+                    { status: "declined",  label: "✗ 불가", sel: "bg-red-500     hover:bg-red-600     text-white border-red-500"     },
+                  ] as const
+                ).map(({ status, label, sel }) => {
+                  const isCurrent = event.my_rsvp_status === status;
+                  return (
+                    <Button
+                      key={status}
+                      variant={isCurrent ? "default" : "outline"}
+                      size="sm"
+                      className={`text-xs font-medium ${isCurrent ? sel : "text-muted-foreground hover:text-foreground"}`}
+                      disabled={rsvp.isPending}
+                      onClick={() =>
+                        rsvp.mutate(
+                          { eventId, status: isCurrent ? null : status },
+                          {
+                            onSuccess: () => toast.success(isCurrent ? "응답이 취소되었습니다" : `${label.slice(2)}로 응답했습니다`),
+                            onError: (err: any) => toast.error(err.message),
+                          }
+                        )
+                      }
+                    >
+                      {label}
+                    </Button>
+                  );
+                })}
+              </div>
             </div>
-          )}
 
-          {/* 구분선 */}
-          <div className="h-px bg-border" />
-
-          {/* 참석 현황 */}
-          <div className="space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">참석 현황</p>
-            <div className="flex items-center gap-6">
-              {[
-                { count: accepted,  label: "수락", color: "bg-emerald-500" },
-                { count: tentative, label: "미정", color: "bg-amber-500"   },
-                { count: declined,  label: "불가", color: "bg-red-500"     },
-              ].map(({ count, label, color }) => (
-                <div key={label} className="flex items-center gap-2">
-                  <div className={`h-2.5 w-2.5 rounded-full ${color}`} />
-                  <span className="text-sm font-bold tabular-nums">{count}</span>
-                  <span className="text-xs text-muted-foreground">{label}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* 내 응답 */}
-          <div className="space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">내 응답</p>
-            <div className="grid grid-cols-3 gap-2">
-              {(
-                [
-                  { status: "accepted",  label: "✓ 참여", sel: "bg-emerald-500 hover:bg-emerald-600 text-white border-emerald-500" },
-                  { status: "tentative", label: "? 미정", sel: "bg-amber-500   hover:bg-amber-600   text-white border-amber-500"   },
-                  { status: "declined",  label: "✗ 불가", sel: "bg-red-500     hover:bg-red-600     text-white border-red-500"     },
-                ] as const
-              ).map(({ status, label, sel }) => {
-                const isCurrent = event.my_rsvp_status === status;
-                return (
+            {/* 관리 (creator only) */}
+            {isCreator && (
+              <div className="pt-4 border-t space-y-3">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">관리</p>
+                <div className="flex flex-wrap gap-2">
+                  {!event.is_template && (
+                    <Button
+                      variant="outline" size="sm" className="h-8 text-xs"
+                      disabled={saveAsTemplate.isPending}
+                      onClick={onSaveTemplate}
+                    >
+                      <BookCopy className="mr-1.5 h-3.5 w-3.5" />템플릿 저장
+                    </Button>
+                  )}
                   <Button
-                    key={status}
-                    variant={isCurrent ? "default" : "outline"}
-                    size="sm"
-                    className={`text-xs font-medium ${isCurrent ? sel : "text-muted-foreground hover:text-foreground"}`}
-                    disabled={rsvp.isPending}
+                    variant="outline" size="sm" className="h-8 text-xs"
                     onClick={() =>
-                      rsvp.mutate(
-                        { eventId, status: isCurrent ? null : status },
-                        {
-                          onSuccess: () => toast.success(isCurrent ? "응답이 취소되었습니다" : `${label.slice(2)}로 응답했습니다`),
-                          onError: (err: any) => toast.error(err.message),
-                        }
+                      downloadIcal(eventId, `${event.title ?? "event"}.ics`).catch(
+                        (err) => toast.error(err.message)
                       )
                     }
                   >
-                    {label}
+                    <Download className="mr-1.5 h-3.5 w-3.5" />.ics 내보내기
                   </Button>
-                );
-              })}
-            </div>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="destructive" size="sm" className="h-8 text-xs" disabled={deleteEvent.isPending}>
+                        삭제
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>이벤트를 삭제할까요?</AlertDialogTitle>
+                        <AlertDialogDescription>이 작업은 되돌릴 수 없습니다.</AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>취소</AlertDialogCancel>
+                        <AlertDialogAction onClick={onDelete}>삭제</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* 관리 (creator only) */}
-          {isCreator && (
-            <div className="pt-4 border-t space-y-3">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">관리</p>
-              <div className="flex flex-wrap gap-2">
-                {!event.is_template && (
-                  <Button
-                    variant="outline" size="sm" className="h-8 text-xs"
-                    disabled={saveAsTemplate.isPending}
-                    onClick={onSaveTemplate}
-                  >
-                    <BookCopy className="mr-1.5 h-3.5 w-3.5" />템플릿 저장
-                  </Button>
-                )}
-                <Button
-                  variant="outline" size="sm" className="h-8 text-xs"
-                  onClick={() =>
-                    downloadIcal(eventId, `${event.title ?? "event"}.ics`).catch(
-                      (err) => toast.error(err.message)
-                    )
-                  }
-                >
-                  <Download className="mr-1.5 h-3.5 w-3.5" />.ics 내보내기
-                </Button>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="destructive" size="sm" className="h-8 text-xs" disabled={deleteEvent.isPending}>
-                      삭제
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>이벤트를 삭제할까요?</AlertDialogTitle>
-                      <AlertDialogDescription>이 작업은 되돌릴 수 없습니다.</AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>취소</AlertDialogCancel>
-                      <AlertDialogAction onClick={onDelete}>삭제</AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* ══ 우: Gemini AI (상단) + 댓글 (하단) ══ */}
-        <div className="flex flex-col divide-y overflow-hidden">
-
-          {/* AI 패널 — 컴팩트 고정 높이 */}
-          <div className="shrink-0 flex flex-col gap-2.5 p-4">
+          {/* 우: Gemini AI (컴팩트, 스크롤) */}
+          <div className="overflow-y-auto p-4 flex flex-col gap-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5">
                 <GeminiIcon className="h-3.5 w-3.5 text-blue-500" />
@@ -807,7 +807,7 @@ function EventDetailView({
                 }
               </Button>
             </div>
-            <div className="rounded-lg bg-blue-50/60 dark:bg-blue-950/10 border border-blue-100 dark:border-blue-900/30 p-2.5 max-h-36 overflow-y-auto">
+            <div className="flex-1 rounded-lg bg-blue-50/60 dark:bg-blue-950/10 border border-blue-100 dark:border-blue-900/30 p-2.5">
               {suggestions.isError && (
                 <p className="text-[11px] text-destructive">
                   {(suggestions.error as any)?.message ?? "추천을 불러오지 못했습니다."}
@@ -824,15 +824,15 @@ function EventDetailView({
               ) : null}
             </div>
           </div>
+        </div>
 
-          {/* 댓글 / 로그 — 나머지 높이 전부 */}
-          <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-            <div className="px-4 pt-3 pb-2 shrink-0">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">댓글 / 로그</p>
-            </div>
-            <div className="flex-1 overflow-hidden px-4 pb-4">
-              <CommentSection eventId={eventId} />
-            </div>
+        {/* ══ 하단: 댓글 / 로그 (전체 너비) ══ */}
+        <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+          <div className="px-6 pt-3 pb-2 border-b shrink-0">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">댓글 / 로그</p>
+          </div>
+          <div className="flex-1 overflow-hidden px-6 pb-4">
+            <CommentSection eventId={eventId} />
           </div>
         </div>
       </div>
