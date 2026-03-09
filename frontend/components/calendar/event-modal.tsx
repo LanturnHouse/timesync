@@ -56,7 +56,6 @@ import {
   useSaveAsTemplate,
   useRSVP,
   useAvailability,
-  useEventSuggestions,
 } from "@/hooks/use-events";
 import {
   Popover,
@@ -541,15 +540,6 @@ function EventFormFields({
   );
 }
 
-// Gemini 4-point star icon
-function GeminiIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden>
-      <path d="M12 2C12 2 13.8 8.5 18.5 12C13.8 15.5 12 22 12 22C12 22 10.2 15.5 5.5 12C10.2 8.5 12 2 12 2Z" />
-    </svg>
-  );
-}
-
 // ── View Mode: detail view ──────────────────────────────────────────────────
 
 function EventDetailView({
@@ -575,8 +565,6 @@ function EventDetailView({
   saveAsTemplate: any;
   deleteEvent: any;
 }) {
-  const suggestions = useEventSuggestions(eventId);
-
   const startDate = event.start_at ? new Date(event.start_at) : null;
   const endDate   = event.end_at   ? new Date(event.end_at)   : null;
 
@@ -651,14 +639,14 @@ function EventDetailView({
         </div>
       </div>
 
-      {/* ── BODY: 상단(정보 좌 + AI 우) / 하단(댓글 전체너비) ── */}
+      {/* ── BODY: 상단(이벤트 정보) / 하단(댓글) ── */}
       <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
 
-        {/* ══ 상단: 이벤트 정보(좌) + Gemini AI(우) ══ */}
-        <div className="flex-[0_0_58%] grid grid-cols-[1fr_260px] divide-x border-b overflow-hidden">
+        {/* ══ 상단: 이벤트 정보 (전체 너비) ══ */}
+        <div className="flex-[0_0_45%] border-b overflow-hidden">
 
-          {/* 좌: 이벤트 정보 (넓고, 스크롤 가능) */}
-          <div className="overflow-y-auto p-6 flex flex-col gap-5">
+          {/* 이벤트 정보 (스크롤 가능) */}
+          <div className="h-full overflow-y-auto p-6 flex flex-col gap-5">
 
             {/* 날짜 & 시간 */}
             <div className="flex items-start gap-3">
@@ -788,42 +776,6 @@ function EventDetailView({
             )}
           </div>
 
-          {/* 우: Gemini AI (컴팩트, 스크롤) */}
-          <div className="overflow-y-auto p-4 flex flex-col gap-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <GeminiIcon className="h-3.5 w-3.5 text-blue-500" />
-                <span className="text-xs font-semibold text-blue-700 dark:text-blue-400">Gemini AI 추천</span>
-              </div>
-              <Button
-                variant="ghost" size="sm"
-                className="h-6 px-2 text-[11px] text-blue-600 hover:text-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900/30"
-                disabled={suggestions.isFetching}
-                onClick={() => suggestions.refetch()}
-              >
-                {suggestions.isFetching
-                  ? <><Loader2 className="mr-1 h-2.5 w-2.5 animate-spin" />생성 중…</>
-                  : "추천 받기"
-                }
-              </Button>
-            </div>
-            <div className="flex-1 rounded-lg bg-blue-50/60 dark:bg-blue-950/10 border border-blue-100 dark:border-blue-900/30 p-2.5">
-              {suggestions.isError && (
-                <p className="text-[11px] text-destructive">
-                  {(suggestions.error as any)?.message ?? "추천을 불러오지 못했습니다."}
-                </p>
-              )}
-              {suggestions.data ? (
-                <p className="text-[11px] leading-relaxed whitespace-pre-wrap text-muted-foreground">
-                  {suggestions.data.suggestions}
-                </p>
-              ) : !suggestions.isFetching ? (
-                <p className="text-[11px] text-muted-foreground/50 italic">
-                  추천 받기를 눌러 준비 팁을 확인하세요.
-                </p>
-              ) : null}
-            </div>
-          </div>
         </div>
 
         {/* ══ 하단: 댓글 / 로그 (전체 너비) ══ */}

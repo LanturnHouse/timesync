@@ -195,16 +195,15 @@ export function useRSVP() {
   });
 }
 
-export function useEventSuggestions(eventId: string | null) {
+export function useScheduleSummary(period: "today" | "week" | "month") {
   return useQuery({
-    queryKey: ["events", eventId, "suggestions"],
+    queryKey: ["events", "summary", period],
     queryFn: () =>
-      apiFetch<{ suggestions: string; event_id: string }>(
-        `/events/${eventId}/suggest/`,
+      apiFetch<{ summary: string; period: string; event_count: number }>(
+        `/events/summary/?period=${period}`,
         authHeaders(),
       ),
-    enabled: false, // Only fetch on demand via refetch()
-    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    staleTime: 3 * 60 * 1000, // 3분 캐시
     retry: false,
   });
 }

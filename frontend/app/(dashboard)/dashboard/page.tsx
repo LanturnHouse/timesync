@@ -3,6 +3,7 @@
 import { useCallback, useState } from "react";
 import { CalendarView } from "@/components/calendar/calendar-view";
 import { EventModal } from "@/components/calendar/event-modal";
+import { AiSummaryPopover } from "@/components/dashboard/ai-summary-popover";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Download, Search, X } from "lucide-react";
@@ -114,8 +115,9 @@ export default function DashboardPage() {
           ))}
         </div>
 
-        {/* Export */}
-        <div className="ml-auto">
+        {/* AI 요약 + Export */}
+        <div className="ml-auto flex items-center gap-2">
+          <AiSummaryPopover />
           <Button
             variant="outline"
             size="sm"

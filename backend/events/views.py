@@ -1,3 +1,6 @@
+import calendar as _calendar
+from datetime import timedelta
+
 from django.db import models
 from django.http import HttpResponse
 from django.utils import timezone
@@ -525,64 +528,71 @@ class EventViewSet(viewsets.ModelViewSet):
             status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
         )
 
-    @action(detail=True, methods=["get"])
-    def suggest(self, request, pk=None):
-        """Generate AI suggestions for an event using Google Gemini."""
+    @action(detail=False, methods=["get"])
+    def summary(self, request):
+        """사용자의 기간별 일정을 AI로 요약한다."""
         from django.conf import settings as django_settings
 
         try:
             from google import genai as google_genai
         except ImportError:
             return Response(
-                {"detail": "AI suggestions feature is not available."},
+                {"detail": "AI 기능을 사용할 수 없습니다."},
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
 
         api_key = getattr(django_settings, "GEMINI_API_KEY", "")
         if not api_key:
-            return Response({"suggestions": "AI 추천 기능이 설정되지 않았습니다."})
+            return Response({"summary": "AI 기능이 설정되지 않았습니다."})
 
-        event = self.get_object()
+        period = request.query_params.get("period", "week")  # today | week | month
+        now = timezone.now()
 
-        # Compute duration
-        duration_minutes = int((event.end_at - event.start_at).total_seconds() / 60)
-        duration_str = (
-            f"{duration_minutes // 60}시간 {duration_minutes % 60}분"
-            if duration_minutes >= 60
-            else f"{duration_minutes}분"
-        )
+        if period == "today":
+            start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            end = now.replace(hour=23, minute=59, second=59, microsecond=999999)
+            label = "오늘"
+        elif period == "month":
+            start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            last_day = _calendar.monthrange(now.year, now.month)[1]
+            end = now.replace(day=last_day, hour=23, minute=59, second=59, microsecond=999999)
+            label = f"{now.month}월"
+        else:  # week (default)
+            weekday = now.weekday()  # Mon=0
+            start = (now - timedelta(days=weekday)).replace(hour=0, minute=0, second=0, microsecond=0)
+            end = (start + timedelta(days=6)).replace(hour=23, minute=59, second=59, microsecond=999999)
+            label = "이번 주"
 
-        # Build RSVP summary
-        rsvp_counts = event.rsvp_counts if hasattr(event, "rsvp_counts") else {}
-        if not rsvp_counts:
-            from .models import EventRSVP
-            counts = EventRSVP.objects.filter(event=event).values("status").annotate(
-                count=models.Count("status")
+        # 해당 기간의 사용자 이벤트 조회
+        events = Event.objects.filter(
+            owner=request.user,
+            start_at__gte=start,
+            start_at__lte=end,
+        ).order_by("start_at")
+
+        if not events.exists():
+            return Response({
+                "summary": f"{label}에 등록된 일정이 없습니다.",
+                "period": period,
+                "event_count": 0,
+            })
+
+        # 프롬프트 구성
+        lines = [f"[{label} 일정 목록]"]
+        for ev in events:
+            month = ev.start_at.month
+            day = ev.start_at.day
+            time_str = ev.start_at.strftime("%H:%M")
+            lines.append(
+                f"- {month}월 {day}일 {time_str} / {ev.title}"
+                + (f" ({ev.category})" if ev.category else "")
             )
-            rsvp_counts = {row["status"]: row["count"] for row in counts}
-
-        accepted = rsvp_counts.get("accepted", 0)
-        tentative = rsvp_counts.get("tentative", 0)
-        declined = rsvp_counts.get("declined", 0)
-
-        # Build context
-        context_lines = [
-            f"이벤트 제목: {event.title}",
-            f"카테고리: {event.category or '없음'}",
-            f"시작: {event.start_at.strftime('%Y-%m-%d %H:%M')} (UTC)",
-            f"종료: {event.end_at.strftime('%Y-%m-%d %H:%M')} (UTC)",
-            f"소요 시간: {duration_str}",
-        ]
-        if event.description:
-            context_lines.append(f"설명: {event.description}")
-        if event.group:
-            context_lines.append(f"그룹: {event.group.name}")
-        context_lines.append(f"RSVP 현황 — 수락: {accepted}, 미정: {tentative}, 불가: {declined}")
 
         prompt = (
-            "다음 일정 정보를 바탕으로 이 이벤트를 더 잘 진행하기 위한 실용적인 추천사항을 "
-            "3~5개 번호 목록으로 알려주세요. 한국어로 간결하게 답변해 주세요.\n\n"
-            + "\n".join(context_lines)
+            "아래는 사용자의 " + label + " 일정 목록입니다. "
+            "이 일정들을 자연스럽고 친근한 한국어로 2~4문장으로 요약해 주세요. "
+            "총 일정 수, 가장 바쁜 날, 주요 일정 등을 포함하면 좋습니다.\n\n"
+            + "\n".join(lines)
         )
 
         try:
@@ -591,11 +601,14 @@ class EventViewSet(viewsets.ModelViewSet):
                 model="gemini-2.5-flash-lite",
                 contents=prompt,
             )
-            suggestions_text = response.text
-            return Response({"suggestions": suggestions_text, "event_id": str(event.id)})
+            return Response({
+                "summary": response.text,
+                "period": period,
+                "event_count": events.count(),
+            })
         except Exception as exc:
             return Response(
-                {"detail": f"AI 추천 생성에 실패했습니다: {str(exc)}"},
+                {"detail": f"AI 요약 생성에 실패했습니다: {str(exc)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
