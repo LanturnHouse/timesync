@@ -37,7 +37,7 @@ import {
   BookCopy,
   Calendar,
   CalendarSearch,
-  Check,
+
   ChevronLeft,
   ChevronRight,
   Clock,

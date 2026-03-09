@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import { CalendarView } from "@/components/calendar/calendar-view";
 import { EventModal } from "@/components/calendar/event-modal";
 import { Button } from "@/components/ui/button";

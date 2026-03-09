@@ -127,7 +127,7 @@ export function CalendarView({
         eventClick={handleEventClick}
         eventDrop={handleEventDrop}
         eventResize={handleEventResize}
-        loading={(loading) => {
+        loading={(_loading) => {
           // FullCalendar internal loading state
         }}
         height="auto"
