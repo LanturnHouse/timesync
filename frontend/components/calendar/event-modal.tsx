@@ -681,23 +681,22 @@ function EventDetailView({
             {/* 참석 현황 */}
             <div className="space-y-3">
               <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">참석 현황</p>
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3">
                 {(
                   [
-                    { count: accepted,  users: event.rsvp_details?.accepted  ?? [], label: "수락", dot: "bg-emerald-500", badge: "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-800" },
-                    { count: tentative, users: event.rsvp_details?.tentative ?? [], label: "미정", dot: "bg-amber-500",   badge: "bg-amber-50   text-amber-700   border-amber-200   hover:bg-amber-100   dark:bg-amber-950/20   dark:text-amber-400   dark:border-amber-800"   },
-                    { count: declined,  users: event.rsvp_details?.declined  ?? [], label: "불가", dot: "bg-red-500",     badge: "bg-red-50     text-red-700     border-red-200     hover:bg-red-100     dark:bg-red-950/20     dark:text-red-400     dark:border-red-800"     },
-                  ] as { count: number; users: RsvpUser[]; label: string; dot: string; badge: string }[]
-                ).map(({ count, users, label, dot, badge }) => (
+                    { count: accepted,  users: event.rsvp_details?.accepted  ?? [], label: "수락", numColor: "text-emerald-500" },
+                    { count: tentative, users: event.rsvp_details?.tentative ?? [], label: "미정", numColor: "text-amber-500"   },
+                    { count: declined,  users: event.rsvp_details?.declined  ?? [], label: "불가", numColor: "text-red-500"     },
+                  ] as { count: number; users: RsvpUser[]; label: string; numColor: string }[]
+                ).map(({ count, users, label, numColor }) => (
                   <Popover key={label}>
                     <PopoverTrigger asChild>
                       <button
-                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium border transition-colors ${badge}`}
+                        className="flex flex-col items-center gap-0.5 rounded-xl border bg-background px-5 py-2.5 transition-colors hover:bg-muted disabled:opacity-50 disabled:cursor-default min-w-[72px]"
                         disabled={count === 0}
                       >
-                        <span className={`h-2 w-2 rounded-full ${dot}`} />
-                        <span className="font-bold tabular-nums">{count}</span>
-                        <span>{label}</span>
+                        <span className={`text-2xl font-bold tabular-nums leading-none ${numColor}`}>{count}</span>
+                        <span className="text-xs text-muted-foreground mt-1">{label}</span>
                       </button>
                     </PopoverTrigger>
                     {count > 0 && (
