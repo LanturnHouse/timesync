@@ -681,7 +681,7 @@ function EventDetailView({
             {/* 참석 현황 */}
             <div className="space-y-3">
               <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">참석 현황</p>
-              <div className="flex items-center gap-3">
+              <div className="grid grid-cols-3 gap-2">
                 {(
                   [
                     { count: accepted,  users: event.rsvp_details?.accepted  ?? [], label: "수락", numColor: "text-emerald-500" },
@@ -692,7 +692,7 @@ function EventDetailView({
                   <Popover key={label}>
                     <PopoverTrigger asChild>
                       <button
-                        className="flex flex-col items-center gap-0.5 rounded-xl border bg-background px-5 py-2.5 transition-colors hover:bg-muted disabled:opacity-50 disabled:cursor-default min-w-[72px]"
+                        className="w-full flex flex-col items-center gap-0.5 rounded-xl border bg-background py-2.5 transition-colors hover:bg-muted disabled:opacity-50 disabled:cursor-default"
                         disabled={count === 0}
                       >
                         <span className={`text-2xl font-bold tabular-nums leading-none ${numColor}`}>{count}</span>
