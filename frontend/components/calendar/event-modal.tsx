@@ -44,7 +44,6 @@ import {
   Download,
   Loader2,
   Pencil,
-  Sparkles,
   Users,
   X,
 } from "lucide-react";
@@ -542,6 +541,15 @@ function EventFormFields({
   );
 }
 
+// Gemini 4-point star icon
+function GeminiIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden>
+      <path d="M12 2C12 2 13.8 8.5 18.5 12C13.8 15.5 12 22 12 22C12 22 10.2 15.5 5.5 12C10.2 8.5 12 2 12 2Z" />
+    </svg>
+  );
+}
+
 // ── View Mode: detail view ──────────────────────────────────────────────────
 
 function EventDetailView({
@@ -586,130 +594,143 @@ function EventDetailView({
     ? `${format(startDate, "HH:mm")} – ${format(endDate!, "HH:mm")}`
     : "";
 
+  const durationMinutes = startDate && endDate
+    ? Math.round((endDate.getTime() - startDate.getTime()) / 60000)
+    : 0;
+  const durationStr = durationMinutes >= 60
+    ? `${Math.floor(durationMinutes / 60)}시간${durationMinutes % 60 > 0 ? ` ${durationMinutes % 60}분` : ""}`
+    : `${durationMinutes}분`;
+
   const accepted  = event.rsvp_counts?.accepted  ?? 0;
   const tentative = event.rsvp_counts?.tentative ?? 0;
   const declined  = event.rsvp_counts?.declined  ?? 0;
 
   return (
-    <DialogContent className="sm:max-w-5xl h-[85vh] flex flex-col p-0 gap-0 overflow-hidden [&>button:last-child]:hidden">
+    <DialogContent className="sm:max-w-[880px] h-[84vh] flex flex-col p-0 gap-0 overflow-hidden [&>button:last-child]:hidden">
+
+      {/* ── 이벤트 컬러 상단 스트립 ── */}
+      {event.color && (
+        <div className="h-1.5 w-full shrink-0 rounded-t-lg" style={{ backgroundColor: event.color }} />
+      )}
 
       {/* ── HEADER ── */}
-      <DialogHeader className="px-6 py-4 border-b shrink-0">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-start gap-3 min-w-0">
-            {event.color && (
-              <div
-                className="mt-1.5 h-3.5 w-3.5 shrink-0 rounded-full"
-                style={{ backgroundColor: event.color }}
-              />
+      <div className="flex items-start justify-between gap-4 px-6 py-4 border-b shrink-0">
+        <div className="min-w-0 flex-1">
+          <DialogTitle className="text-xl font-semibold leading-snug pr-2">
+            {event.title}
+          </DialogTitle>
+          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+            {event.category && (
+              <Badge variant="secondary" className="text-xs font-normal">
+                {CATEGORY_LABELS[event.category] ?? event.category}
+              </Badge>
             )}
-            <div className="min-w-0">
-              <DialogTitle className="text-xl font-semibold leading-tight">
-                {event.title}
-              </DialogTitle>
-              <div className="flex items-center gap-2 mt-1 flex-wrap">
-                {event.category && (
-                  <Badge variant="secondary" className="text-xs">
-                    {CATEGORY_LABELS[event.category] ?? event.category}
-                  </Badge>
-                )}
-                {event.group_name && (
-                  <span className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Users className="h-3 w-3" />
-                    {event.group_name}
-                  </span>
-                )}
-                {event.rrule && (
-                  <span className="text-xs text-muted-foreground">
-                    {rruleHumanLabel(event.rrule)}
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-1.5 shrink-0">
-            {isCreator && (
-              <Button variant="outline" size="sm" onClick={onEdit}>
-                <Pencil className="mr-1.5 h-3.5 w-3.5" />
-                편집
-              </Button>
+            {event.group_name && (
+              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                <Users className="h-3 w-3" />
+                {event.group_name}
+              </span>
             )}
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onClose}>
-              <X className="h-4 w-4" />
-            </Button>
+            {event.rrule && (
+              <span className="text-xs text-muted-foreground">
+                {rruleHumanLabel(event.rrule)}
+              </span>
+            )}
           </div>
         </div>
-      </DialogHeader>
+        <div className="flex items-center gap-1 shrink-0">
+          {isCreator && (
+            <Button variant="ghost" size="sm" className="h-8 text-muted-foreground hover:text-foreground" onClick={onEdit}>
+              <Pencil className="mr-1.5 h-3.5 w-3.5" />
+              편집
+            </Button>
+          )}
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={onClose}>
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
 
       {/* ── BODY ── */}
-      <div className="flex-1 min-h-0 grid grid-cols-[240px_1fr] divide-x overflow-hidden">
+      <div className="flex-1 min-h-0 grid grid-cols-[320px_1fr] divide-x overflow-hidden">
 
-        {/* ── LEFT: compact info ── */}
-        <div className="flex flex-col overflow-y-auto p-5 gap-5">
+        {/* ── LEFT: 이벤트 정보 ── */}
+        <div className="flex flex-col overflow-y-auto p-5 gap-4">
 
-          {/* Date & Time */}
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-2 text-sm">
-              <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
-              <span className="font-medium">{dateStr}</span>
+          {/* 날짜 & 시간 */}
+          <div className="flex items-start gap-3">
+            <div className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center shrink-0 mt-0.5">
+              <Calendar className="h-4 w-4 text-muted-foreground" />
             </div>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground pl-6">
-              <Clock className="h-3.5 w-3.5 shrink-0" />
-              <span>{timeStr}</span>
+            <div>
+              <p className="text-sm font-medium">{dateStr}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {timeStr}
+                {durationMinutes > 0 && (
+                  <span className="ml-1.5 text-muted-foreground/60">({durationStr})</span>
+                )}
+              </p>
             </div>
           </div>
 
-          {/* Description */}
+          {/* 설명 */}
           {event.description && (
-            <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap border-l-2 border-muted pl-3">
-              {event.description}
-            </p>
+            <div className="rounded-lg bg-muted/50 px-3.5 py-3">
+              <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                {event.description}
+              </p>
+            </div>
           )}
 
-          {/* RSVP 현황 — compact inline */}
-          <div className="flex items-center gap-3 text-sm">
-            <span className="flex items-center gap-1 font-medium text-green-600 dark:text-green-400">
-              <span className="text-base font-bold">{accepted}</span>
-              <span className="text-xs text-muted-foreground font-normal">수락</span>
-            </span>
-            <span className="text-border">·</span>
-            <span className="flex items-center gap-1 font-medium text-amber-600 dark:text-amber-400">
-              <span className="text-base font-bold">{tentative}</span>
-              <span className="text-xs text-muted-foreground font-normal">미정</span>
-            </span>
-            <span className="text-border">·</span>
-            <span className="flex items-center gap-1 font-medium text-red-600 dark:text-red-400">
-              <span className="text-base font-bold">{declined}</span>
-              <span className="text-xs text-muted-foreground font-normal">불가</span>
-            </span>
+          {/* 구분선 */}
+          <div className="h-px bg-border" />
+
+          {/* 참석 현황 */}
+          <div className="space-y-2">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              참석 현황
+            </p>
+            <div className="flex items-center gap-4">
+              {[
+                { count: accepted,  label: "수락", color: "bg-emerald-500" },
+                { count: tentative, label: "미정", color: "bg-amber-500"   },
+                { count: declined,  label: "불가", color: "bg-red-500"     },
+              ].map(({ count, label, color }) => (
+                <div key={label} className="flex items-center gap-1.5">
+                  <div className={`h-2 w-2 rounded-full ${color}`} />
+                  <span className="text-sm font-semibold tabular-nums">{count}</span>
+                  <span className="text-xs text-muted-foreground">{label}</span>
+                </div>
+              ))}
+            </div>
           </div>
 
           {/* 내 응답 */}
-          <div className="space-y-1.5">
-            <p className="text-xs text-muted-foreground">내 응답</p>
-            <div className="flex gap-1.5">
+          <div className="space-y-2">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              내 응답
+            </p>
+            <div className="grid grid-cols-3 gap-2">
               {(
                 [
-                  { status: "accepted",  label: "참여", activeClass: "bg-green-500 hover:bg-green-600 text-white border-green-500" },
-                  { status: "tentative", label: "미정", activeClass: "bg-amber-500 hover:bg-amber-600 text-white border-amber-500" },
-                  { status: "declined",  label: "불가", activeClass: "bg-red-500   hover:bg-red-600   text-white border-red-500"   },
+                  { status: "accepted",  label: "✓ 참여", sel: "bg-emerald-500 hover:bg-emerald-600 text-white border-emerald-500" },
+                  { status: "tentative", label: "? 미정", sel: "bg-amber-500   hover:bg-amber-600   text-white border-amber-500"   },
+                  { status: "declined",  label: "✗ 불가", sel: "bg-red-500     hover:bg-red-600     text-white border-red-500"     },
                 ] as const
-              ).map(({ status, label, activeClass }) => {
+              ).map(({ status, label, sel }) => {
                 const isCurrent = event.my_rsvp_status === status;
                 return (
                   <Button
                     key={status}
                     variant={isCurrent ? "default" : "outline"}
                     size="sm"
-                    className={`h-7 px-2.5 text-xs ${isCurrent ? activeClass : ""}`}
+                    className={`text-xs font-medium ${isCurrent ? sel : "text-muted-foreground hover:text-foreground"}`}
                     disabled={rsvp.isPending}
                     onClick={() =>
                       rsvp.mutate(
                         { eventId, status: isCurrent ? null : status },
                         {
-                          onSuccess: () =>
-                            toast.success(isCurrent ? "응답이 취소되었습니다" : `${label}로 응답했습니다`),
+                          onSuccess: () => toast.success(isCurrent ? "응답이 취소되었습니다" : `${label.slice(2)}로 응답했습니다`),
                           onError: (err: any) => toast.error(err.message),
                         }
                       )
@@ -722,44 +743,79 @@ function EventDetailView({
             </div>
           </div>
 
-          {/* 관리 (creator) */}
+          {/* Gemini AI 추천 */}
+          <div className="rounded-xl border border-blue-200/60 dark:border-blue-800/30 bg-gradient-to-br from-blue-50 to-sky-50/60 dark:from-blue-950/20 dark:to-sky-950/10 p-4 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <GeminiIcon className="h-4 w-4 text-blue-500" />
+                <span className="text-sm font-medium text-blue-700 dark:text-blue-400">Gemini 추천</span>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2.5 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900/30"
+                disabled={suggestions.isFetching}
+                onClick={() => suggestions.refetch()}
+              >
+                {suggestions.isFetching
+                  ? <><Loader2 className="mr-1 h-3 w-3 animate-spin" />생성 중…</>
+                  : "추천 받기"
+                }
+              </Button>
+            </div>
+            <div className="min-h-[3rem]">
+              {suggestions.isError && (
+                <p className="text-xs text-destructive">
+                  {(suggestions.error as any)?.message ?? "추천을 불러오지 못했습니다."}
+                </p>
+              )}
+              {suggestions.data ? (
+                <p className="text-xs leading-relaxed whitespace-pre-wrap text-muted-foreground">
+                  {suggestions.data.suggestions}
+                </p>
+              ) : !suggestions.isFetching ? (
+                <p className="text-xs text-muted-foreground/70">
+                  이벤트 정보를 바탕으로 준비 팁을 제공합니다.
+                </p>
+              ) : null}
+            </div>
+          </div>
+
+          {/* 관리 (creator only) — mt-auto로 하단 고정 */}
           {isCreator && (
-            <div className="pt-3 border-t space-y-1.5 mt-auto">
-              <p className="text-xs text-muted-foreground">관리</p>
-              <div className="flex flex-wrap gap-1.5">
+            <div className="mt-auto pt-4 border-t space-y-2">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                관리
+              </p>
+              <div className="flex flex-wrap gap-2">
                 {!event.is_template && (
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-7 px-2.5 text-xs"
+                    className="h-8 text-xs"
                     disabled={saveAsTemplate.isPending}
                     onClick={onSaveTemplate}
                   >
-                    <BookCopy className="mr-1 h-3 w-3" />
-                    템플릿
+                    <BookCopy className="mr-1.5 h-3.5 w-3.5" />
+                    템플릿 저장
                   </Button>
                 )}
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-7 px-2.5 text-xs"
+                  className="h-8 text-xs"
                   onClick={() =>
                     downloadIcal(eventId, `${event.title ?? "event"}.ics`).catch(
                       (err) => toast.error(err.message)
                     )
                   }
                 >
-                  <Download className="mr-1 h-3 w-3" />
-                  .ics
+                  <Download className="mr-1.5 h-3.5 w-3.5" />
+                  .ics 내보내기
                 </Button>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      className="h-7 px-2.5 text-xs"
-                      disabled={deleteEvent.isPending}
-                    >
+                    <Button variant="destructive" size="sm" className="h-8 text-xs" disabled={deleteEvent.isPending}>
                       삭제
                     </Button>
                   </AlertDialogTrigger>
@@ -779,54 +835,13 @@ function EventDetailView({
           )}
         </div>
 
-        {/* ── RIGHT: AI + Comments ── */}
+        {/* ── RIGHT: 댓글 ── */}
         <div className="flex flex-col overflow-hidden">
-
-          {/* AI 추천 */}
-          <div className="flex flex-col overflow-hidden border-b" style={{ flex: "0 0 38%" }}>
-            <div className="flex items-center justify-between px-5 pt-4 pb-3 shrink-0">
-              <div className="flex items-center gap-1.5">
-                <Sparkles className="h-3.5 w-3.5 text-violet-500" />
-                <span className="text-sm font-medium">AI 추천</span>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7 px-2.5 text-xs"
-                disabled={suggestions.isFetching}
-                onClick={() => suggestions.refetch()}
-              >
-                {suggestions.isFetching ? (
-                  <><Loader2 className="mr-1 h-3 w-3 animate-spin" />분석 중…</>
-                ) : (
-                  <><Sparkles className="mr-1 h-3 w-3" />추천 받기</>
-                )}
-              </Button>
-            </div>
-            <div className="flex-1 overflow-y-auto px-5 pb-4">
-              {suggestions.isError && (
-                <p className="text-sm text-destructive">
-                  {(suggestions.error as any)?.message ?? "AI 추천을 불러오지 못했습니다."}
-                </p>
-              )}
-              {suggestions.data ? (
-                <p className="text-sm leading-relaxed whitespace-pre-wrap text-muted-foreground">
-                  {suggestions.data.suggestions}
-                </p>
-              ) : !suggestions.isFetching ? (
-                <p className="text-sm text-muted-foreground">
-                  Claude AI가 이벤트 준비를 도와드립니다. 위 버튼을 눌러 추천을 받아보세요.
-                </p>
-              ) : null}
-            </div>
+          <div className="px-5 pt-4 pb-3 border-b shrink-0">
+            <p className="text-sm font-semibold">댓글 / 로그</p>
           </div>
-
-          {/* 댓글 */}
-          <div className="flex flex-col overflow-hidden flex-1">
-            <p className="text-sm font-medium px-5 pt-4 pb-2 shrink-0">댓글 / 로그</p>
-            <div className="flex-1 overflow-hidden px-5 pb-4">
-              <CommentSection eventId={eventId} />
-            </div>
+          <div className="flex-1 overflow-hidden p-5">
+            <CommentSection eventId={eventId} />
           </div>
         </div>
       </div>

@@ -527,18 +527,18 @@ class EventViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["get"])
     def suggest(self, request, pk=None):
-        """Generate AI suggestions for an event using Claude."""
+        """Generate AI suggestions for an event using Google Gemini."""
         from django.conf import settings as django_settings
 
         try:
-            import anthropic as anthropic_sdk
+            from google import genai as google_genai
         except ImportError:
             return Response(
                 {"detail": "AI suggestions feature is not available."},
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
 
-        api_key = getattr(django_settings, "ANTHROPIC_API_KEY", "")
+        api_key = getattr(django_settings, "GEMINI_API_KEY", "")
         if not api_key:
             return Response({"suggestions": "AI 추천 기능이 설정되지 않았습니다."})
 
@@ -565,7 +565,7 @@ class EventViewSet(viewsets.ModelViewSet):
         tentative = rsvp_counts.get("tentative", 0)
         declined = rsvp_counts.get("declined", 0)
 
-        # Build context lines
+        # Build context
         context_lines = [
             f"이벤트 제목: {event.title}",
             f"카테고리: {event.category or '없음'}",
@@ -581,18 +581,17 @@ class EventViewSet(viewsets.ModelViewSet):
 
         prompt = (
             "다음 일정 정보를 바탕으로 이 이벤트를 더 잘 진행하기 위한 실용적인 추천사항을 "
-            "3~5개 번호 목록으로 알려주세요. 한국어로 답변해 주세요.\n\n"
+            "3~5개 번호 목록으로 알려주세요. 한국어로 간결하게 답변해 주세요.\n\n"
             + "\n".join(context_lines)
         )
 
         try:
-            client = anthropic_sdk.Anthropic(api_key=api_key)
-            message = client.messages.create(
-                model="claude-opus-4-6",
-                max_tokens=600,
-                messages=[{"role": "user", "content": prompt}],
+            client = google_genai.Client(api_key=api_key)
+            response = client.models.generate_content(
+                model="gemini-2.0-flash",
+                contents=prompt,
             )
-            suggestions_text = message.content[0].text
+            suggestions_text = response.text
             return Response({"suggestions": suggestions_text, "event_id": str(event.id)})
         except Exception as exc:
             return Response(
