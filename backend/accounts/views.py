@@ -1,3 +1,5 @@
+import os
+
 from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
 from allauth.socialaccount.providers.oauth2.client import OAuth2Client
 from dj_rest_auth.registration.views import SocialLoginView
@@ -14,8 +16,12 @@ class GoogleLogin(SocialLoginView):
     Accepts an authorization code from the frontend and returns JWT tokens.
     """
     adapter_class = GoogleOAuth2Adapter
-    callback_url = "http://localhost:3000/callback"
     client_class = OAuth2Client
+
+    @property
+    def callback_url(self):
+        frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+        return f"{frontend_url}/callback"
 
 
 class UserProfileView(generics.RetrieveUpdateAPIView):
