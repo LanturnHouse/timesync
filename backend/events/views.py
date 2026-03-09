@@ -585,37 +585,49 @@ class EventViewSet(viewsets.ModelViewSet):
             + "\n".join(context_lines)
         )
 
-        # 사용 가능한 모델 순서대로 시도
-        CANDIDATE_MODELS = [
-            "gemini-2.0-flash-lite",
-            "gemini-1.5-flash-8b",
-            "gemini-1.5-flash",
-            "gemini-2.0-flash",
-        ]
-
         import logging
         logger = logging.getLogger(__name__)
 
-        last_exc = None
         client = google_genai.Client(api_key=api_key)
-        for model_name in CANDIDATE_MODELS:
-            try:
-                response = client.models.generate_content(
-                    model=model_name,
-                    contents=prompt,
-                )
-                suggestions_text = response.text
-                logger.info("Gemini suggest succeeded with model: %s", model_name)
-                return Response({"suggestions": suggestions_text, "event_id": str(event.id)})
-            except Exception as exc:
-                logger.warning("Gemini model %s failed: %s", model_name, exc)
-                last_exc = exc
-                continue
 
-        return Response(
-            {"detail": f"AI 추천 생성에 실패했습니다: {str(last_exc)}"},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        )
+        # 이 API 키로 사용 가능한 모델 중 generateContent 지원 모델을 자동 선택
+        PREFERRED = ["gemini-2.0-flash-lite", "gemini-1.5-flash-8b", "gemini-1.5-flash", "gemini-2.0-flash"]
+        selected_model = None
+        try:
+            available = [m.name for m in client.models.list()]
+            # client.models.list() 반환 이름은 "models/gemini-..." 형식
+            available_bare = [n.replace("models/", "") for n in available]
+            for candidate in PREFERRED:
+                if candidate in available_bare:
+                    selected_model = candidate
+                    break
+            if not selected_model and available_bare:
+                # PREFERRED 목록에 없으면 첫 번째 사용 가능 모델 사용
+                selected_model = available_bare[0]
+        except Exception as list_exc:
+            logger.warning("Could not list Gemini models: %s", list_exc)
+            selected_model = PREFERRED[0]  # 기본값 시도
+
+        if not selected_model:
+            return Response(
+                {"detail": "사용 가능한 Gemini 모델을 찾을 수 없습니다. API 키를 확인해 주세요."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        try:
+            response = client.models.generate_content(
+                model=selected_model,
+                contents=prompt,
+            )
+            suggestions_text = response.text
+            logger.info("Gemini suggest succeeded with model: %s", selected_model)
+            return Response({"suggestions": suggestions_text, "event_id": str(event.id)})
+        except Exception as exc:
+            logger.error("Gemini suggest failed with model %s: %s", selected_model, exc)
+            return Response(
+                {"detail": f"AI 추천 생성에 실패했습니다 (모델: {selected_model}): {str(exc)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
     @action(detail=False, methods=["get"])
     def availability(self, request):
