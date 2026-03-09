@@ -831,7 +831,7 @@ function EventDetailView({
           <div className="px-6 pt-3 pb-2 border-b shrink-0">
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">댓글 / 로그</p>
           </div>
-          <div className="flex-1 overflow-hidden px-6 pb-4">
+          <div className="flex-1 min-h-0 flex flex-col px-6 pb-4 overflow-hidden">
             <CommentSection eventId={eventId} />
           </div>
         </div>

@@ -585,19 +585,37 @@ class EventViewSet(viewsets.ModelViewSet):
             + "\n".join(context_lines)
         )
 
-        try:
-            client = google_genai.Client(api_key=api_key)
-            response = client.models.generate_content(
-                model="gemini-1.5-flash",
-                contents=prompt,
-            )
-            suggestions_text = response.text
-            return Response({"suggestions": suggestions_text, "event_id": str(event.id)})
-        except Exception as exc:
-            return Response(
-                {"detail": f"AI 추천 생성에 실패했습니다: {str(exc)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
+        # 사용 가능한 모델 순서대로 시도
+        CANDIDATE_MODELS = [
+            "gemini-2.0-flash-lite",
+            "gemini-1.5-flash-8b",
+            "gemini-1.5-flash",
+            "gemini-2.0-flash",
+        ]
+
+        import logging
+        logger = logging.getLogger(__name__)
+
+        last_exc = None
+        client = google_genai.Client(api_key=api_key)
+        for model_name in CANDIDATE_MODELS:
+            try:
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=prompt,
+                )
+                suggestions_text = response.text
+                logger.info("Gemini suggest succeeded with model: %s", model_name)
+                return Response({"suggestions": suggestions_text, "event_id": str(event.id)})
+            except Exception as exc:
+                logger.warning("Gemini model %s failed: %s", model_name, exc)
+                last_exc = exc
+                continue
+
+        return Response(
+            {"detail": f"AI 추천 생성에 실패했습니다: {str(last_exc)}"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
 
     @action(detail=False, methods=["get"])
     def availability(self, request):
