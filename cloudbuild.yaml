@@ -1,0 +1,17 @@
+steps:
+  - name: 'gcr.io/cloud-builders/gcloud'
+    id: deploy
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        gcloud compute ssh timesync-vm \
+          --zone=us-central1-a \
+          --project=timesync-488620 \
+          --tunnel-through-iap \
+          --command="cd /opt/timesync && git pull origin master && bash scripts/deploy.sh"
+
+timeout: '1200s'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
