@@ -30,8 +30,10 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { CommentSection } from "@/components/calendar/comment-section";
+import type { RsvpUser } from "@/types";
 import {
   AlertTriangle,
   BookCopy,
@@ -679,17 +681,46 @@ function EventDetailView({
             {/* 참석 현황 */}
             <div className="space-y-3">
               <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">참석 현황</p>
-              <div className="flex items-center gap-6">
-                {[
-                  { count: accepted,  label: "수락", color: "bg-emerald-500" },
-                  { count: tentative, label: "미정", color: "bg-amber-500"   },
-                  { count: declined,  label: "불가", color: "bg-red-500"     },
-                ].map(({ count, label, color }) => (
-                  <div key={label} className="flex items-center gap-2">
-                    <div className={`h-2.5 w-2.5 rounded-full ${color}`} />
-                    <span className="text-sm font-bold tabular-nums">{count}</span>
-                    <span className="text-xs text-muted-foreground">{label}</span>
-                  </div>
+              <div className="flex items-center gap-4">
+                {(
+                  [
+                    { count: accepted,  users: event.rsvp_details?.accepted  ?? [], label: "수락", dot: "bg-emerald-500", badge: "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-800" },
+                    { count: tentative, users: event.rsvp_details?.tentative ?? [], label: "미정", dot: "bg-amber-500",   badge: "bg-amber-50   text-amber-700   border-amber-200   hover:bg-amber-100   dark:bg-amber-950/20   dark:text-amber-400   dark:border-amber-800"   },
+                    { count: declined,  users: event.rsvp_details?.declined  ?? [], label: "불가", dot: "bg-red-500",     badge: "bg-red-50     text-red-700     border-red-200     hover:bg-red-100     dark:bg-red-950/20     dark:text-red-400     dark:border-red-800"     },
+                  ] as { count: number; users: RsvpUser[]; label: string; dot: string; badge: string }[]
+                ).map(({ count, users, label, dot, badge }) => (
+                  <Popover key={label}>
+                    <PopoverTrigger asChild>
+                      <button
+                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium border transition-colors ${badge}`}
+                        disabled={count === 0}
+                      >
+                        <span className={`h-2 w-2 rounded-full ${dot}`} />
+                        <span className="font-bold tabular-nums">{count}</span>
+                        <span>{label}</span>
+                      </button>
+                    </PopoverTrigger>
+                    {count > 0 && (
+                      <PopoverContent className="w-56 p-2" align="start">
+                        <p className="text-xs font-semibold text-muted-foreground px-2 py-1 mb-1">{label} ({count}명)</p>
+                        <div className="space-y-1">
+                          {users.map((u) => (
+                            <div key={u.id} className="flex items-center gap-2 px-2 py-1 rounded-md hover:bg-muted">
+                              <Avatar className="h-6 w-6 shrink-0">
+                                <AvatarImage src={u.avatar_url ?? undefined} />
+                                <AvatarFallback className="text-[10px]">
+                                  {(u.display_name || u.email).charAt(0).toUpperCase()}
+                                </AvatarFallback>
+                              </Avatar>
+                              <span className="text-xs truncate">
+                                {u.display_name || u.email}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </PopoverContent>
+                    )}
+                  </Popover>
                 ))}
               </div>
             </div>

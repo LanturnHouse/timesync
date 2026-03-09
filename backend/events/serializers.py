@@ -27,6 +27,7 @@ class EventSerializer(serializers.ModelSerializer):
     shared_to_groups = serializers.SerializerMethodField()
     my_rsvp_status = serializers.SerializerMethodField()
     rsvp_counts = serializers.SerializerMethodField()
+    rsvp_details = serializers.SerializerMethodField()
     parent_id = serializers.PrimaryKeyRelatedField(
         source="parent_event", read_only=True
     )
@@ -38,7 +39,7 @@ class EventSerializer(serializers.ModelSerializer):
             "group", "group_name", "title", "start_at", "end_at",
             "description", "category", "color", "is_template",
             "bg_image_url", "shared_to_groups",
-            "my_rsvp_status", "rsvp_counts",
+            "my_rsvp_status", "rsvp_counts", "rsvp_details",
             "rrule", "recurrence_id", "parent_id",
             "created_at", "updated_at",
         )
@@ -60,6 +61,17 @@ class EventSerializer(serializers.ModelSerializer):
             "declined": obj.rsvps.filter(status="declined").count(),
             "tentative": obj.rsvps.filter(status="tentative").count(),
         }
+
+    def get_rsvp_details(self, obj):
+        result = {"accepted": [], "tentative": [], "declined": []}
+        for rsvp in obj.rsvps.select_related("user").all():
+            result[rsvp.status].append({
+                "id": str(rsvp.user.id),
+                "display_name": rsvp.user.display_name or "",
+                "email": rsvp.user.email,
+                "avatar_url": rsvp.user.avatar_url,
+            })
+        return result
 
 
 class CalendarEventSerializer(serializers.ModelSerializer):

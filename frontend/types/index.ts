@@ -98,12 +98,24 @@ export interface Event {
   // RSVP
   my_rsvp_status: "accepted" | "declined" | "tentative" | null;
   rsvp_counts: { accepted: number; declined: number; tentative: number };
+  rsvp_details: {
+    accepted: RsvpUser[];
+    tentative: RsvpUser[];
+    declined: RsvpUser[];
+  };
   // Recurrence (Sprint 5-5)
   rrule: string;
   recurrence_id: string | null;
   parent_id: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface RsvpUser {
+  id: string;
+  display_name: string;
+  email: string;
+  avatar_url: string | null;
 }
 
 export interface EventRSVP {
