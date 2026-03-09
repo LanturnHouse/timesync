@@ -565,7 +565,7 @@ class EventViewSet(viewsets.ModelViewSet):
 
         # 해당 기간의 사용자 이벤트 조회
         events = Event.objects.filter(
-            owner=request.user,
+            creator=request.user,
             start_at__gte=start,
             start_at__lte=end,
         ).order_by("start_at")
