@@ -11,7 +11,6 @@ import type { DateClickArg, EventResizeDoneArg } from "@fullcalendar/interaction
 import { useCalendarEvents, useUpdateEvent } from "@/hooks/use-events";
 import { toFullCalendarEvents } from "@/lib/calendar-utils";
 import { toast } from "sonner";
-import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const VIEWS = [
@@ -43,6 +42,7 @@ export function CalendarView({
   });
   const [currentView, setCurrentView] = useState("dayGridMonth");
   const [titleText, setTitleText] = useState("");
+  const [animClass, setAnimClass] = useState("");
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
 
@@ -55,6 +55,16 @@ export function CalendarView({
   const updateEvent = useUpdateEvent();
 
   const api = () => calendarRef.current?.getApi();
+
+  const goNext = useCallback(() => {
+    api()?.next();
+    setAnimClass("cal-slide-left");
+  }, []);
+
+  const goPrev = useCallback(() => {
+    api()?.prev();
+    setAnimClass("cal-slide-right");
+  }, []);
 
   const handleDatesSet = useCallback((arg: DatesSetArg) => {
     setDateRange({
@@ -129,8 +139,8 @@ export function CalendarView({
     touchStartY.current = null;
     // Trigger only when horizontal movement is dominant and exceeds threshold
     if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 60) {
-      if (dx < 0) api()?.next();
-      else api()?.prev();
+      if (dx < 0) goNext();
+      else goPrev();
     }
   };
 
@@ -138,34 +148,10 @@ export function CalendarView({
 
   return (
     <div className="h-full flex flex-col">
-      {/* Custom header: [←][오늘][→] [title] [월/주/일/목록] [actions] */}
+      {/* Custom header: [title] [월/주/일/목록] [actions] */}
       <div className="flex items-center gap-1 pb-2 shrink-0 min-w-0">
-        {/* Navigation */}
-        <div className="flex items-center gap-0.5 shrink-0">
-          <button
-            onClick={() => api()?.prev()}
-            className="rounded-md p-1.5 hover:bg-muted transition-colors"
-            aria-label="이전"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </button>
-          <button
-            onClick={() => api()?.today()}
-            className="rounded-md px-2 py-1 text-xs font-medium hover:bg-muted transition-colors"
-          >
-            오늘
-          </button>
-          <button
-            onClick={() => api()?.next()}
-            className="rounded-md p-1.5 hover:bg-muted transition-colors"
-            aria-label="다음"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </button>
-        </div>
-
         {/* Title */}
-        <span className="flex-1 text-center text-sm font-semibold truncate px-1">
+        <span className="flex-1 text-sm font-semibold truncate px-1">
           {titleText}
         </span>
 
@@ -193,9 +179,10 @@ export function CalendarView({
         )}
       </div>
 
-      {/* Calendar body with swipe detection */}
+      {/* Calendar body with swipe detection + slide animation */}
       <div
-        className="flex-1 min-h-0"
+        className={`flex-1 min-h-0 ${animClass}`}
+        onAnimationEnd={() => setAnimClass("")}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >

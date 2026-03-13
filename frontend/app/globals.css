@@ -210,6 +210,18 @@
   }
 }
 
+/* ─── 캘린더 슬라이드 전환 애니메이션 ─── */
+@keyframes cal-slide-from-right {
+  from { transform: translateX(40px); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+@keyframes cal-slide-from-left {
+  from { transform: translateX(-40px); opacity: 0; }
+  to   { transform: translateX(0);     opacity: 1; }
+}
+.cal-slide-left  { animation: cal-slide-from-right 0.25s ease-out; }
+.cal-slide-right { animation: cal-slide-from-left  0.25s ease-out; }
+
 @layer base {
   :root {
     --background: 0 0% 100%;
