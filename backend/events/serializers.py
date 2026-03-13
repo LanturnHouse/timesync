@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import Event, EventRSVP, EventShare
+from .models import Event, EventLog, EventRSVP, EventShare
 
 
 class EventRSVPSerializer(serializers.ModelSerializer):
@@ -27,6 +27,7 @@ class EventSerializer(serializers.ModelSerializer):
     shared_to_groups = serializers.SerializerMethodField()
     my_rsvp_status = serializers.SerializerMethodField()
     rsvp_counts = serializers.SerializerMethodField()
+    rsvp_details = serializers.SerializerMethodField()
     parent_id = serializers.PrimaryKeyRelatedField(
         source="parent_event", read_only=True
     )
@@ -36,13 +37,14 @@ class EventSerializer(serializers.ModelSerializer):
         fields = (
             "id", "creator", "creator_email", "creator_display_name",
             "group", "group_name", "title", "start_at", "end_at",
-            "description", "category", "color", "is_template",
+            "description", "category", "color", "is_template", "is_tombstone",
+            "status", "reminder_minutes",
             "bg_image_url", "shared_to_groups",
-            "my_rsvp_status", "rsvp_counts",
+            "my_rsvp_status", "rsvp_counts", "rsvp_details",
             "rrule", "recurrence_id", "parent_id",
             "created_at", "updated_at",
         )
-        read_only_fields = ("id", "creator", "created_at", "updated_at")
+        read_only_fields = ("id", "creator", "is_tombstone", "created_at", "updated_at")
 
     def get_shared_to_groups(self, obj):
         return list(obj.shares.values_list("group_id", flat=True))
@@ -61,6 +63,17 @@ class EventSerializer(serializers.ModelSerializer):
             "tentative": obj.rsvps.filter(status="tentative").count(),
         }
 
+    def get_rsvp_details(self, obj):
+        result = {"accepted": [], "tentative": [], "declined": []}
+        for rsvp in obj.rsvps.select_related("user").all():
+            result[rsvp.status].append({
+                "id": str(rsvp.user.id),
+                "display_name": rsvp.user.display_name or "",
+                "email": rsvp.user.email,
+                "avatar_url": rsvp.user.avatar_url,
+            })
+        return result
+
 
 class CalendarEventSerializer(serializers.ModelSerializer):
     """Lightweight serializer for FullCalendar rendering."""
@@ -75,9 +88,32 @@ class CalendarEventSerializer(serializers.ModelSerializer):
         fields = (
             "id", "title", "start_at", "end_at", "color",
             "category", "creator", "creator_email",
-            "group", "group_name", "description", "is_template",
+            "group", "group_name", "description", "is_template", "is_tombstone",
+            "status",
             "rrule", "recurrence_id", "parent_id",
         )
+
+
+class EventLogSerializer(serializers.ModelSerializer):
+    actor_email = serializers.EmailField(source="actor.email", read_only=True, default=None)
+    actor_display_name = serializers.CharField(
+        source="actor.display_name", read_only=True, default=None
+    )
+    actor_avatar_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = EventLog
+        fields = (
+            "id", "action", "detail",
+            "actor", "actor_email", "actor_display_name", "actor_avatar_url",
+            "created_at",
+        )
+        read_only_fields = ("id", "created_at")
+
+    def get_actor_avatar_url(self, obj):
+        if obj.actor:
+            return obj.actor.avatar_url
+        return None
 
 
 class EventShareSerializer(serializers.ModelSerializer):

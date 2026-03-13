@@ -217,6 +217,9 @@ CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
 TOSS_SECRET_KEY = os.getenv("TOSS_SECRET_KEY", "")
 TOSS_CLIENT_KEY = os.getenv("TOSS_CLIENT_KEY", "")
 
+# ---------- GOOGLE GEMINI AI ----------
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+
 # ---------- CHANNEL LAYERS (WebSocket) ----------
 CHANNEL_LAYERS = {
     "default": {

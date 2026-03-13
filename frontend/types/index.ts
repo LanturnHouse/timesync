@@ -41,17 +41,31 @@ export interface SubscriptionPaymentRecord {
   created_at: string;
 }
 
+export interface BoostTransfer {
+  id: string;
+  status: "pending" | "completed" | "cancelled";
+  apply_at: string;
+  source_group_name: string;
+  target_group_name: string;
+  target_group_id: string;
+  created_at: string;
+}
+
 export interface BoostSubscription {
   id: string;
   user: string;
   user_email: string;
+  user_display_name: string;
   group: string;
-  plan: "lv1" | "lv2" | "lv3";
+  group_name: string;
+  quantity: number;
+  amount: number;
   status: "active" | "past_due" | "expired" | "cancelled";
   current_period_start: string;
   current_period_end: string;
   cancel_at_period_end: boolean;
   failed_attempts: number;
+  pending_transfer: BoostTransfer | null;
   payments: SubscriptionPaymentRecord[];
   created_at: string;
 }
@@ -79,17 +93,43 @@ export interface Event {
   category: string;
   color: string;
   is_template: boolean;
+  is_tombstone: boolean;
+  status: "confirmed" | "tentative";
+  reminder_minutes: number | null;
   bg_image_url: string | null;
   shared_to_groups: string[];
   // RSVP
   my_rsvp_status: "accepted" | "declined" | "tentative" | null;
   rsvp_counts: { accepted: number; declined: number; tentative: number };
-  // Recurrence (Sprint 5-5)
+  rsvp_details: {
+    accepted: RsvpUser[];
+    tentative: RsvpUser[];
+    declined: RsvpUser[];
+  };
+  // Recurrence
   rrule: string;
   recurrence_id: string | null;
   parent_id: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface EventLog {
+  id: string;
+  action: "updated" | "status_changed" | "rsvp_changed";
+  detail: Record<string, unknown>;
+  actor: string | null;
+  actor_email: string | null;
+  actor_display_name: string | null;
+  actor_avatar_url: string | null;
+  created_at: string;
+}
+
+export interface RsvpUser {
+  id: string;
+  display_name: string;
+  email: string;
+  avatar_url: string | null;
 }
 
 export interface EventRSVP {
@@ -229,6 +269,8 @@ export interface FullCalendarEvent {
   color?: string;
   backgroundColor?: string;
   borderColor?: string;
+  opacity?: number;
+  classNames?: string[];
   extendedProps: {
     creator: string;
     creator_email: string;
@@ -237,5 +279,7 @@ export interface FullCalendarEvent {
     description: string | null;
     category: string;
     is_template: boolean;
+    is_tombstone: boolean;
+    status: "confirmed" | "tentative";
   };
 }

@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { apiFetch } from "@/lib/api";
 import { useAuth } from "@/providers/auth-provider";
+import { Loader2 } from "lucide-react";
 import type { AuthTokens } from "@/types";
 
 function CallbackHandler() {
@@ -15,7 +16,7 @@ function CallbackHandler() {
   useEffect(() => {
     const code = searchParams.get("code");
     if (!code) {
-      router.push("/login");
+      router.replace("/login");
       return;
     }
 
@@ -24,25 +25,24 @@ function CallbackHandler() {
       body: JSON.stringify({ code }),
     })
       .then(async ({ access, refresh }) => {
-        // login() sets tokens AND awaits fetchUser() so isAuthenticated
-        // is true before we navigate — preventing the redirect-to-login race.
         await login(access, refresh);
         const pendingInvite = sessionStorage.getItem("pending_invite");
         if (pendingInvite) {
           sessionStorage.removeItem("pending_invite");
-          router.push(`/invite/${pendingInvite}`);
+          router.replace(`/invite/${pendingInvite}`);
         } else {
-          router.push("/dashboard");
+          router.replace("/dashboard");
         }
       })
       .catch(() => {
-        router.push("/login");
+        router.replace("/login");
       });
   }, [searchParams, router, login]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center">
-      <p className="text-lg text-muted-foreground">Signing you in...</p>
+    <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background">
+      <Loader2 className="h-10 w-10 animate-spin text-primary" />
+      <p className="text-sm text-muted-foreground">로그인 중...</p>
     </div>
   );
 }
@@ -51,8 +51,9 @@ export default function CallbackPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center">
-          <p className="text-lg text-muted-foreground">Loading...</p>
+        <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background">
+          <Loader2 className="h-10 w-10 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">로그인 중...</p>
         </div>
       }
     >

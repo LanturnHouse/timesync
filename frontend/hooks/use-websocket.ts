@@ -69,6 +69,16 @@ export function useGroupWebSocket(groupId: string | null) {
           queryClient.invalidateQueries({ queryKey: ["boosts"] });
           queryClient.invalidateQueries({ queryKey: ["groups"] });
           break;
+        case "boost.transferred":
+        case "subscription.renewed":
+        case "subscription.cancelled":
+        case "subscription.expired":
+        case "subscription.payment_failed":
+          queryClient.invalidateQueries({ queryKey: ["subscriptions"] });
+          queryClient.invalidateQueries({ queryKey: ["my-subscriptions"] });
+          queryClient.invalidateQueries({ queryKey: ["my-subscriptions-all"] });
+          queryClient.invalidateQueries({ queryKey: ["groups"] });
+          break;
         default:
           break;
       }

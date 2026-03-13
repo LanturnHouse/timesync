@@ -1,29 +1,48 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
 import { getAccessToken } from "@/lib/auth";
-import type { BoostSubscription, SubscriptionPlan } from "@/types";
+import type { BoostSubscription, BoostTransfer } from "@/types";
 
 function authHeaders() {
   const token = getAccessToken();
   return token ? { token } : {};
 }
 
-/** GET /api/payments/plans/ — 구독 플랜 목록 */
+export interface PlansInfo {
+  per_boost_price: number;
+  max_quantity: number;
+  tier_thresholds: Record<string, number>;
+}
+
+/** GET /api/payments/plans/ — 부스트 단가 정보 */
 export function useSubscriptionPlans() {
   return useQuery({
     queryKey: ["subscription-plans"],
-    queryFn: () => apiFetch<SubscriptionPlan[]>("/payments/plans/"),
-    staleTime: Infinity, // 정적 데이터
+    queryFn: () => apiFetch<PlansInfo>("/payments/plans/"),
+    staleTime: Infinity,
   });
 }
 
-/** GET /api/payments/subscription/?group={groupId} — 그룹 구독 정보 */
-export function useGroupSubscription(groupId: string | null) {
+/** GET /api/payments/subscriptions/?group={groupId} — 그룹 내 전체 활성 구독 */
+export function useGroupSubscriptions(groupId: string | null) {
   return useQuery({
-    queryKey: ["subscription", groupId],
+    queryKey: ["subscriptions", groupId],
     queryFn: () =>
-      apiFetch<BoostSubscription | null>(
-        `/payments/subscription/?group=${groupId}`,
+      apiFetch<BoostSubscription[]>(
+        `/payments/subscriptions/?group=${groupId}`,
+        authHeaders()
+      ),
+    enabled: !!groupId,
+  });
+}
+
+/** GET /api/payments/my-subscriptions/?group={groupId} — 내 구독 목록 */
+export function useMySubscriptions(groupId: string | null) {
+  return useQuery({
+    queryKey: ["my-subscriptions", groupId],
+    queryFn: () =>
+      apiFetch<BoostSubscription[]>(
+        `/payments/my-subscriptions/?group=${groupId}`,
         authHeaders()
       ),
     enabled: !!groupId,
@@ -33,15 +52,17 @@ export function useGroupSubscription(groupId: string | null) {
 /** POST /api/payments/prepare-billing/ */
 export function usePrepareBilling() {
   return useMutation({
-    mutationFn: (data: { plan: string; group_id: string }) =>
-      apiFetch<{ customer_key: string; plan: string; amount: number; order_name: string }>(
-        "/payments/prepare-billing/",
-        {
-          method: "POST",
-          body: JSON.stringify(data),
-          ...authHeaders(),
-        }
-      ),
+    mutationFn: (data: { quantity: number; group_id: string }) =>
+      apiFetch<{
+        customer_key: string;
+        quantity: number;
+        amount: number;
+        order_name: string;
+      }>("/payments/prepare-billing/", {
+        method: "POST",
+        body: JSON.stringify(data),
+        ...authHeaders(),
+      }),
   });
 }
 
@@ -52,7 +73,7 @@ export function useConfirmBilling() {
     mutationFn: (data: {
       auth_key: string;
       customer_key: string;
-      plan: string;
+      quantity: number;
       group_id: string;
     }) =>
       apiFetch<BoostSubscription>("/payments/confirm-billing/", {
@@ -61,24 +82,82 @@ export function useConfirmBilling() {
         ...authHeaders(),
       }),
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["subscription", variables.group_id] });
+      queryClient.invalidateQueries({ queryKey: ["subscriptions", variables.group_id] });
+      queryClient.invalidateQueries({ queryKey: ["my-subscriptions", variables.group_id] });
+      queryClient.invalidateQueries({ queryKey: ["my-subscriptions-all"] });
       queryClient.invalidateQueries({ queryKey: ["groups"] });
     },
   });
 }
 
-/** POST /api/payments/cancel/ */
+/** GET /api/payments/my-subscriptions/ — 내 전체 구독 (그룹 필터 없음, 설정 페이지용) */
+export function useAllMySubscriptions() {
+  return useQuery({
+    queryKey: ["my-subscriptions-all"],
+    queryFn: () =>
+      apiFetch<BoostSubscription[]>("/payments/my-subscriptions/", authHeaders()),
+  });
+}
+
+/** POST /api/payments/transfer/ — 부스트를 다른 그룹으로 이동 예약 (3일 후 적용) */
+export function useTransferBoost() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      subscriptionId,
+      targetGroupId,
+    }: {
+      subscriptionId: string;
+      targetGroupId: string;
+    }) =>
+      apiFetch<BoostTransfer>("/payments/transfer/", {
+        method: "POST",
+        body: JSON.stringify({
+          subscription_id: subscriptionId,
+          target_group_id: targetGroupId,
+        }),
+        ...authHeaders(),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["subscriptions"] });
+      queryClient.invalidateQueries({ queryKey: ["my-subscriptions"] });
+      queryClient.invalidateQueries({ queryKey: ["my-subscriptions-all"] });
+    },
+  });
+}
+
+/** POST /api/payments/cancel-transfer/ — 이동 예약 취소 */
+export function useCancelTransfer() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (transferId: string) =>
+      apiFetch<{ message: string }>("/payments/cancel-transfer/", {
+        method: "POST",
+        body: JSON.stringify({ transfer_id: transferId }),
+        ...authHeaders(),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["subscriptions"] });
+      queryClient.invalidateQueries({ queryKey: ["my-subscriptions"] });
+      queryClient.invalidateQueries({ queryKey: ["my-subscriptions-all"] });
+    },
+  });
+}
+
+/** POST /api/payments/cancel/ — 특정 구독 취소 예약 */
 export function useCancelSubscription() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (groupId: string) =>
+    mutationFn: ({ subscriptionId, groupId }: { subscriptionId: string; groupId: string }) =>
       apiFetch<{ message: string; expires_at: string }>("/payments/cancel/", {
         method: "POST",
-        body: JSON.stringify({ group_id: groupId }),
+        body: JSON.stringify({ subscription_id: subscriptionId }),
         ...authHeaders(),
       }),
-    onSuccess: (_, groupId) => {
-      queryClient.invalidateQueries({ queryKey: ["subscription", groupId] });
+    onSuccess: (_, { groupId }) => {
+      queryClient.invalidateQueries({ queryKey: ["subscriptions", groupId] });
+      queryClient.invalidateQueries({ queryKey: ["my-subscriptions", groupId] });
+      queryClient.invalidateQueries({ queryKey: ["my-subscriptions-all"] });
     },
   });
 }

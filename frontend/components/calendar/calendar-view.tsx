@@ -6,7 +6,7 @@ import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
 import listPlugin from "@fullcalendar/list";
-import type { DateSelectArg, EventClickArg, EventDropArg } from "@fullcalendar/core";
+import type { DateSelectArg, DatesSetArg, EventClickArg, EventDropArg } from "@fullcalendar/core";
 import type { EventResizeDoneArg } from "@fullcalendar/interaction";
 import { useCalendarEvents, useUpdateEvent } from "@/hooks/use-events";
 import { toFullCalendarEvents } from "@/lib/calendar-utils";
@@ -40,8 +40,14 @@ export function CalendarView({
   const updateEvent = useUpdateEvent();
 
   const handleDatesSet = useCallback(
-    (arg: { startStr: string; endStr: string }) => {
-      setDateRange({ start: arg.startStr, end: arg.endStr });
+    (arg: DatesSetArg) => {
+      // Use view.activeStart/activeEnd — these are the actual visible grid boundaries
+      // (including overflow days from adjacent months), not just the current-month range.
+      // toISOString() produces a full UTC datetime string that the backend can parse.
+      setDateRange({
+        start: arg.view.activeStart.toISOString(),
+        end: arg.view.activeEnd.toISOString(),
+      });
     },
     []
   );
@@ -127,10 +133,10 @@ export function CalendarView({
         eventClick={handleEventClick}
         eventDrop={handleEventDrop}
         eventResize={handleEventResize}
-        loading={(loading) => {
+        loading={() => {
           // FullCalendar internal loading state
         }}
-        height="auto"
+        height="100%"
         nowIndicator={true}
         eventTimeFormat={{
           hour: "2-digit",

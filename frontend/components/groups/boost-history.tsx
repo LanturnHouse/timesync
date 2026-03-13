@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -16,25 +17,43 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useGroupSubscription, useCancelSubscription } from "@/hooks/use-subscriptions";
-import { SubscriptionDialog } from "./subscription-dialog";
 import {
-  AlertTriangle,
-  CheckCircle2,
-  Clock,
-  Lock,
-  Zap,
-} from "lucide-react";
+  useGroupSubscriptions,
+  useMySubscriptions,
+  useCancelSubscription,
+} from "@/hooks/use-subscriptions";
+import { SubscriptionDialog } from "./subscription-dialog";
+import { AlertTriangle, CheckCircle2, Clock, Lock, Zap } from "lucide-react";
 import { toast } from "sonner";
+import type { BoostSubscription } from "@/types";
 
-const TIER_CONFIG: Record<
-  string,
-  { label: string; color: string }
-> = {
+const TIER_CONFIG: Record<string, { label: string; color: string }> = {
   starter: { label: "Starter", color: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200" },
   lv1:     { label: "Level 1", color: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200" },
   lv2:     { label: "Level 2", color: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200" },
   lv3:     { label: "Level 3", color: "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200" },
+};
+
+const NEXT_TIER_LABEL: Record<string, string> = {
+  starter: "Level 1",
+  lv1: "Level 2",
+  lv2: "Level 3",
+};
+
+// boost count needed to reach the NEXT tier
+const NEXT_THRESHOLD: Record<string, number | null> = {
+  starter: 3,
+  lv1: 7,
+  lv2: 15,
+  lv3: null,
+};
+
+// boost count at which the CURRENT tier starts
+const PREV_THRESHOLD: Record<string, number> = {
+  starter: 0,
+  lv1: 3,
+  lv2: 7,
+  lv3: 15,
 };
 
 const TIER_PERKS: Record<string, { label: string; unlocked: boolean }[]> = {
@@ -88,33 +107,44 @@ export function BoostHistory({
   tier,
   memberCount = 0,
   maxMembers,
-  isAdmin = false,
+
   groupName = "그룹",
 }: BoostHistoryProps) {
   const [showSubscribeDialog, setShowSubscribeDialog] = useState(false);
-  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [cancelTarget, setCancelTarget] = useState<BoostSubscription | null>(null);
 
-  const { data: subscription, isLoading } = useGroupSubscription(groupId);
+  const { data: allSubscriptions = [], isLoading: loadingAll } = useGroupSubscriptions(groupId);
+  const { data: mySubscriptions = [], isLoading: loadingMy } = useMySubscriptions(groupId);
   const cancelSubscription = useCancelSubscription();
+
+  const isLoading = loadingAll || loadingMy;
 
   const tierInfo = TIER_CONFIG[tier] ?? TIER_CONFIG.starter;
   const perks = TIER_PERKS[tier] ?? TIER_PERKS.starter;
 
-  const handleCancelConfirm = () => {
-    cancelSubscription.mutate(groupId, {
-      onSuccess: (data) => {
-        toast.success(data.message);
-        setShowCancelDialog(false);
-      },
-      onError: (err) => {
-        toast.error(err instanceof Error ? err.message : "취소 중 오류가 발생했습니다.");
-      },
-    });
-  };
+  const nextThreshold = NEXT_THRESHOLD[tier];
+  const prevThreshold = PREV_THRESHOLD[tier] ?? 0;
+  const progressPercent = nextThreshold
+    ? Math.min(100, ((boostCount - prevThreshold) / (nextThreshold - prevThreshold)) * 100)
+    : 100;
 
-  const expiresAt = subscription?.current_period_end
-    ? new Date(subscription.current_period_end).toLocaleDateString("ko-KR")
-    : null;
+  const mySubIds = new Set(mySubscriptions.map((s) => s.id));
+
+  const handleCancelConfirm = () => {
+    if (!cancelTarget) return;
+    cancelSubscription.mutate(
+      { subscriptionId: cancelTarget.id, groupId },
+      {
+        onSuccess: (data) => {
+          toast.success(data.message ?? "구독 취소가 예약되었습니다.");
+          setCancelTarget(null);
+        },
+        onError: (err) => {
+          toast.error(err instanceof Error ? err.message : "취소 중 오류가 발생했습니다.");
+        },
+      }
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -122,94 +152,39 @@ export function BoostHistory({
       <div className="flex items-center justify-between">
         <div className="space-y-1">
           <div className="flex items-center gap-3">
-            <h3 className="text-lg font-semibold">그룹 구독</h3>
+            <h3 className="text-lg font-semibold">그룹 부스트</h3>
             <Badge className={tierInfo.color}>{tierInfo.label}</Badge>
           </div>
           <p className="text-xs text-muted-foreground">
-            총 {boostCount}회 청구 완료
+            활성 부스트 {boostCount}개
           </p>
         </div>
 
-        {/* 구독 버튼 (어드민만) */}
-        {isAdmin && (
-          <div>
-            {!subscription || subscription.status === "expired" || subscription.status === "cancelled" ? (
-              <Button onClick={() => setShowSubscribeDialog(true)} size="sm">
-                <Zap className="mr-2 h-4 w-4" />
-                구독하기
-              </Button>
-            ) : subscription.status === "active" && !subscription.cancel_at_period_end ? (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowCancelDialog(true)}
-                disabled={cancelSubscription.isPending}
-              >
-                구독 취소
-              </Button>
-            ) : null}
-          </div>
-        )}
+        <Button onClick={() => setShowSubscribeDialog(true)} size="sm">
+          <Zap className="mr-2 h-4 w-4" />
+          부스트 추가
+        </Button>
       </div>
 
-      {/* 구독 상태 배너 */}
-      {isLoading ? (
-        <Skeleton className="h-16 rounded-lg" />
-      ) : subscription ? (
-        <div className="rounded-lg border p-4 space-y-2">
-          {subscription.status === "active" && (
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-sm">
-                <CheckCircle2 className="h-4 w-4 text-green-500" />
-                <span className="font-medium">
-                  {TIER_CONFIG[subscription.plan]?.label ?? subscription.plan} 구독 중
-                </span>
-              </div>
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Clock className="h-3.5 w-3.5" />
-                {subscription.cancel_at_period_end ? (
-                  <span className="text-orange-500 font-medium">
-                    {expiresAt}에 종료 예정
-                  </span>
-                ) : (
-                  <span>다음 결제일: {expiresAt}</span>
-                )}
-              </div>
-            </div>
-          )}
-
-          {subscription.status === "past_due" && (
-            <div className="flex items-start gap-2 text-sm">
-              <AlertTriangle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
-              <div>
-                <p className="font-medium text-destructive">결제 실패</p>
-                <p className="text-xs text-muted-foreground">
-                  카드 정보를 확인해주세요. 3일 내 해결되지 않으면 구독이 만료되고 티어가 Starter로 초기화됩니다.
-                </p>
-              </div>
-            </div>
-          )}
-
-          {(subscription.status === "cancelled" || subscription.status === "expired") && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <XCircleIcon className="h-4 w-4" />
-              <span>구독이 {subscription.status === "cancelled" ? "취소" : "만료"}되었습니다.</span>
-            </div>
-          )}
+      {/* 부스트 진행도 */}
+      {nextThreshold !== null ? (
+        <div className="space-y-1.5">
+          <div className="flex justify-between text-xs text-muted-foreground">
+            <span>{tierInfo.label} → {NEXT_TIER_LABEL[tier]}</span>
+            <span>{boostCount} / {nextThreshold} 부스트</span>
+          </div>
+          <Progress value={progressPercent} className="h-2" />
+          <p className="text-xs text-muted-foreground text-right">
+            다음 레벨까지 {Math.max(0, nextThreshold - boostCount)}개 더 필요
+          </p>
         </div>
-      ) : tier === "starter" ? (
-        <div className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
-          아직 구독하지 않았습니다.{" "}
-          {isAdmin && (
-            <button
-              className="text-primary underline-offset-4 hover:underline"
-              onClick={() => setShowSubscribeDialog(true)}
-            >
-              구독하기
-            </button>
-          )}
+      ) : (
+        <div className="rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 px-4 py-3">
+          <p className="text-sm font-medium text-amber-700 dark:text-amber-300">
+            🏆 최고 티어 달성! Level 3
+          </p>
         </div>
-      ) : null}
+      )}
 
       {/* 멤버 현황 */}
       {maxMembers != null && (
@@ -221,6 +196,30 @@ export function BoostHistory({
           <Progress value={Math.min(100, (memberCount / maxMembers) * 100)} className="h-2" />
         </div>
       )}
+
+      <Separator />
+
+      {/* 부스터 목록 */}
+      <div className="space-y-3">
+        <h4 className="text-sm font-medium">부스터 목록</h4>
+        {isLoading ? (
+          Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-14 rounded-lg" />)
+        ) : allSubscriptions.length === 0 ? (
+          <div className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
+            아직 부스트가 없습니다. 첫 번째 부스터가 되어보세요!
+          </div>
+        ) : (
+          allSubscriptions.map((sub) => (
+            <BoosterRow
+              key={sub.id}
+              subscription={sub}
+              isMine={mySubIds.has(sub.id)}
+              cancelPending={cancelSubscription.isPending && cancelTarget?.id === sub.id}
+              onCancel={() => setCancelTarget(sub)}
+            />
+          ))
+        )}
+      </div>
 
       <Separator />
 
@@ -243,64 +242,33 @@ export function BoostHistory({
         </div>
       </div>
 
-      <Separator />
-
-      {/* 결제 내역 */}
-      <div className="space-y-2">
-        <h4 className="text-sm font-medium text-muted-foreground">결제 내역</h4>
-        {isLoading ? (
-          Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-10" />)
-        ) : !subscription || subscription.payments.length === 0 ? (
-          <p className="text-sm text-muted-foreground">결제 내역이 없습니다.</p>
-        ) : (
-          subscription.payments.map((payment) => (
-            <div
-              key={payment.id}
-              className="flex items-center justify-between rounded-md border px-3 py-2"
-            >
-              <div className="flex items-center gap-2">
-                <div
-                  className={`h-2 w-2 rounded-full ${
-                    payment.status === "success" ? "bg-green-500" : "bg-red-500"
-                  }`}
-                />
-                <span className="text-sm">
-                  ₩{payment.amount.toLocaleString()}
-                </span>
-                {payment.status === "failed" && (
-                  <Badge variant="destructive" className="text-xs">실패</Badge>
-                )}
-              </div>
-              <span className="text-xs text-muted-foreground">
-                {new Date(payment.created_at).toLocaleDateString("ko-KR")}
-              </span>
-            </div>
-          ))
-        )}
-      </div>
-
-      {/* 구독 Dialog */}
+      {/* 부스트 구독 Dialog */}
       <SubscriptionDialog
         open={showSubscribeDialog}
         onOpenChange={setShowSubscribeDialog}
         groupId={groupId}
         groupName={groupName}
+        currentBoostCount={boostCount}
       />
 
       {/* 취소 확인 Dialog */}
-      <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+      <AlertDialog open={!!cancelTarget} onOpenChange={(open) => !open && setCancelTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>구독을 취소하시겠습니까?</AlertDialogTitle>
+            <AlertDialogTitle>부스트 구독을 취소하시겠습니까?</AlertDialogTitle>
             <AlertDialogDescription>
-              현재 구독 기간({expiresAt})까지는 티어가 유지됩니다.
-              기간 종료 후 그룹 티어가 Starter로 변경됩니다.
+              현재 구독 기간(
+              {cancelTarget?.current_period_end
+                ? new Date(cancelTarget.current_period_end).toLocaleDateString("ko-KR")
+                : ""}
+              )까지는 부스트가 유지됩니다. 기간 종료 후 이 부스트가 그룹에서 제거됩니다.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>닫기</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleCancelConfirm}
+              disabled={cancelSubscription.isPending}
               className="bg-destructive hover:bg-destructive/90"
             >
               취소 예약
@@ -312,12 +280,69 @@ export function BoostHistory({
   );
 }
 
-// X 아이콘 인라인 컴포넌트
-function XCircleIcon({ className }: { className?: string }) {
+interface BoosterRowProps {
+  subscription: BoostSubscription;
+  isMine: boolean;
+  cancelPending: boolean;
+  onCancel: () => void;
+}
+
+function BoosterRow({ subscription, isMine, cancelPending, onCancel }: BoosterRowProps) {
+  const initials = subscription.user_display_name
+    ? subscription.user_display_name.slice(0, 2).toUpperCase()
+    : "??";
+
+  const renewalDate = new Date(subscription.current_period_end).toLocaleDateString("ko-KR");
+
   return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <circle cx="12" cy="12" r="10" />
-      <path strokeLinecap="round" strokeLinejoin="round" d="M15 9l-6 6M9 9l6 6" />
-    </svg>
+    <div className="flex items-center gap-3 rounded-lg border px-3 py-2.5">
+      <Avatar className="h-8 w-8 shrink-0">
+        <AvatarFallback className="text-xs">{initials}</AvatarFallback>
+      </Avatar>
+
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-sm font-medium truncate">
+            {subscription.user_display_name || subscription.user_email}
+          </span>
+          {isMine && (
+            <Badge variant="outline" className="text-xs py-0 h-4">나</Badge>
+          )}
+          {subscription.cancel_at_period_end && (
+            <Badge variant="outline" className="text-xs py-0 h-4 text-orange-500 border-orange-300">
+              취소 예정
+            </Badge>
+          )}
+          {subscription.status === "past_due" && (
+            <AlertTriangle className="h-3.5 w-3.5 text-destructive" />
+          )}
+        </div>
+        <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
+          <span>
+            <Zap className="inline h-3 w-3 text-yellow-500 mr-0.5" />
+            {subscription.quantity}개 · ₩{subscription.amount.toLocaleString()}/월
+          </span>
+          <span>·</span>
+          <span className="flex items-center gap-1">
+            <Clock className="h-3 w-3" />
+            {subscription.cancel_at_period_end
+              ? `${renewalDate}에 종료`
+              : `다음 결제: ${renewalDate}`}
+          </span>
+        </div>
+      </div>
+
+      {isMine && !subscription.cancel_at_period_end && subscription.status === "active" && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-xs text-muted-foreground hover:text-destructive h-7 shrink-0"
+          onClick={onCancel}
+          disabled={cancelPending}
+        >
+          취소
+        </Button>
+      )}
+    </div>
   );
 }
