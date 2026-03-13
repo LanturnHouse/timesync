@@ -129,7 +129,8 @@ export function CalendarView({
     touchStartY.current = null;
     // Trigger only when horizontal movement is dominant and exceeds threshold
     if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 60) {
-      dx < 0 ? api()?.next() : api()?.prev();
+      if (dx < 0) api()?.next();
+      else api()?.prev();
     }
   };
 
