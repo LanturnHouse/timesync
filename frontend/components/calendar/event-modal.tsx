@@ -42,7 +42,6 @@ import {
 
   ChevronLeft,
   ChevronRight,
-  Clock,
   Download,
   Loader2,
   Pencil,
@@ -59,7 +58,6 @@ import {
   useRSVP,
   useAvailability,
   useTemplates,
-  useCreateFromTemplate,
   useChangeEventStatus,
 } from "@/hooks/use-events";
 import {
@@ -69,7 +67,6 @@ import {
 } from "@/components/ui/popover";
 import { useGroups } from "@/hooks/use-groups";
 import { useConflicts } from "@/hooks/use-conflicts";
-import { useReminders, useCreateReminder, useDeleteReminder } from "@/hooks/use-reminders";
 import { RecurrenceDialog, type RecurrenceScope } from "@/components/calendar/recurrence-dialog";
 import { rruleHumanLabel } from "@/lib/rrule-utils";
 import { useAuth } from "@/providers/auth-provider";
@@ -973,12 +970,8 @@ export function EventModal({
   const deleteEvent = useDeleteEvent();
   const shareEvent = useShareEvent();
   const saveAsTemplate = useSaveAsTemplate();
-  const createFromTemplate = useCreateFromTemplate();
   const rsvp = useRSVP();
   const changeStatus = useChangeEventStatus();
-  const { data: reminders } = useReminders(masterEventId ?? null);
-  const createReminder = useCreateReminder();
-  const deleteReminder = useDeleteReminder();
   const isCreator = existingEvent?.creator === user?.id;
 
   // Can change status: creator OR group admin/editor
