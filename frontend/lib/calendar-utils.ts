@@ -28,13 +28,16 @@ export function toFullCalendarEvent(event: CalendarEvent): FullCalendarEvent {
     (event.category && CATEGORY_COLORS[event.category]) ||
     (event.group ? getGroupColor(event.group) : "#3b82f6");
 
+  const isTentative = event.status === "tentative";
+
   return {
     id: event.id,
     title: event.title,
     start: event.start_at,
     end: event.end_at,
-    backgroundColor: color,
-    borderColor: color,
+    backgroundColor: isTentative ? `${color}66` : color,  // 40% opacity for tentative
+    borderColor: isTentative ? `${color}88` : color,
+    classNames: isTentative ? ["fc-event-tentative"] : [],
     extendedProps: {
       creator: event.creator,
       creator_email: event.creator_email,
@@ -43,10 +46,15 @@ export function toFullCalendarEvent(event: CalendarEvent): FullCalendarEvent {
       description: event.description,
       category: event.category,
       is_template: event.is_template,
+      is_tombstone: event.is_tombstone ?? false,
+      status: event.status ?? "confirmed",
     },
   };
 }
 
 export function toFullCalendarEvents(events: CalendarEvent[]): FullCalendarEvent[] {
-  return events.map(toFullCalendarEvent);
+  // Filter out templates and tombstones (belt-and-suspenders; backend also filters)
+  return events
+    .filter((e) => !e.is_template && !e.is_tombstone)
+    .map(toFullCalendarEvent);
 }

@@ -69,11 +69,11 @@ export default function DashboardPage() {
   }, []);
 
   return (
-    <div className="relative p-6">
+    <div className="relative flex flex-col h-[calc(100vh-4rem)] p-2 sm:p-4 gap-2 sm:gap-3 overflow-hidden">
       {/* Toolbar */}
-      <div className="mb-4 flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3 shrink-0">
         {/* Search */}
-        <div className="relative flex-1 min-w-[200px] max-w-xs">
+        <div className="relative flex-1 min-w-0 max-w-xs">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
           <Input
             placeholder="Search events..."
@@ -91,14 +91,14 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Category filter */}
-        <div className="flex items-center gap-1.5 flex-wrap">
+        {/* Category filter — 모바일에서 가로 스크롤 */}
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none max-w-full pb-0.5">
           {CATEGORIES.map((cat) => (
             <button
               key={cat.value}
               onClick={() => setCategoryFilter(cat.value === categoryFilter ? "" : cat.value)}
               className={[
-                "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors border",
+                "inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors border",
                 categoryFilter === cat.value
                   ? "bg-foreground text-background border-foreground"
                   : "bg-background text-muted-foreground border-border hover:border-foreground/40",
@@ -116,27 +116,31 @@ export default function DashboardPage() {
         </div>
 
         {/* AI 요약 + Export */}
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-1.5 sm:gap-2 shrink-0">
           <AiSummaryPopover />
+          {/* 모바일: 아이콘만, sm 이상: 텍스트 포함 */}
           <Button
             variant="outline"
             size="sm"
             onClick={() =>
               downloadAllIcal().catch((err) => toast.error(err.message))
             }
+            title="Export All (.ics)"
           >
-            <Download className="mr-1.5 h-3.5 w-3.5" />
-            Export All (.ics)
+            <Download className="h-3.5 w-3.5 sm:mr-1.5" />
+            <span className="hidden sm:inline">Export All (.ics)</span>
           </Button>
         </div>
       </div>
 
-      <CalendarView
-        onDateSelect={handleDateSelect}
-        onEventClick={handleEventClick}
-        categoryFilter={categoryFilter || undefined}
-        search={debouncedSearch || undefined}
-      />
+      <div className="flex-1 min-h-0 overflow-auto">
+        <CalendarView
+          onDateSelect={handleDateSelect}
+          onEventClick={handleEventClick}
+          categoryFilter={categoryFilter || undefined}
+          search={debouncedSearch || undefined}
+        />
+      </div>
       <EventModal
         open={modalOpen}
         onClose={handleClose}

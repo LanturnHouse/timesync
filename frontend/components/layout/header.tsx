@@ -17,12 +17,16 @@ import {
   useMarkRead,
   useMarkAllRead,
 } from "@/hooks/use-notifications";
-import { Bell, LogOut, Moon, Settings, Sun, User } from "lucide-react";
+import { Bell, LogOut, Menu, Moon, Settings, Sun, User } from "lucide-react";
 import Link from "next/link";
 import { useTheme } from "next-themes";
 import { formatDistanceToNow } from "date-fns";
 
-export function Header() {
+interface HeaderProps {
+  onMenuToggle: () => void;
+}
+
+export function Header({ onMenuToggle }: HeaderProps) {
   const { user, logout } = useAuth();
   const { data: notifData } = useNotifications();
   const markRead = useMarkRead();
@@ -42,7 +46,18 @@ export function Header() {
     : user?.email?.charAt(0).toUpperCase() ?? "?";
 
   return (
-    <header className="flex h-14 items-center justify-end gap-2 border-b bg-background px-6">
+    <header className="flex h-14 items-center justify-between gap-2 border-b bg-background px-4">
+      {/* Hamburger — mobile only */}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="md:hidden"
+        onClick={onMenuToggle}
+        aria-label="Open menu"
+      >
+        <Menu className="h-5 w-5" />
+      </Button>
+      <div className="flex items-center gap-2 md:ml-auto">
       {/* Dark Mode Toggle */}
       <Button
         variant="ghost"
@@ -148,6 +163,7 @@ export function Header() {
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+      </div>
     </header>
   );
 }

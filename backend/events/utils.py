@@ -55,6 +55,9 @@ def expand_recurring_event(event, start: str, end: str) -> list[dict]:
             "group_name": event.group.name if event.group else None,
             "description": event.description,
             "is_template": False,
+            "is_tombstone": False,
+            "status": event.status,
+            "reminder_minutes": event.reminder_minutes,
             "rrule": event.rrule,
             "recurrence_id": dt.isoformat(),
             "parent_id": str(event.id),
@@ -64,9 +67,14 @@ def expand_recurring_event(event, start: str, end: str) -> list[dict]:
 
 
 def _parse_dt(dt_str: str):
-    """Parse an ISO datetime string to a timezone-aware datetime."""
-    from django.utils.dateparse import parse_datetime
+    """Parse an ISO datetime or date-only string to a timezone-aware datetime."""
+    from datetime import datetime, time as dt_time
+    from django.utils.dateparse import parse_datetime, parse_date
     dt = parse_datetime(dt_str)
-    if dt and timezone.is_naive(dt):
-        dt = timezone.make_aware(dt)
-    return dt
+    if dt is not None:
+        return dt if timezone.is_aware(dt) else timezone.make_aware(dt)
+    # Fallback: date-only string (e.g. "2026-03-30" from FullCalendar date-only format)
+    d = parse_date(dt_str)
+    if d is not None:
+        return timezone.make_aware(datetime.combine(d, dt_time.min))
+    return None

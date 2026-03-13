@@ -93,6 +93,9 @@ export interface Event {
   category: string;
   color: string;
   is_template: boolean;
+  is_tombstone: boolean;
+  status: "confirmed" | "tentative";
+  reminder_minutes: number | null;
   bg_image_url: string | null;
   shared_to_groups: string[];
   // RSVP
@@ -103,12 +106,23 @@ export interface Event {
     tentative: RsvpUser[];
     declined: RsvpUser[];
   };
-  // Recurrence (Sprint 5-5)
+  // Recurrence
   rrule: string;
   recurrence_id: string | null;
   parent_id: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface EventLog {
+  id: string;
+  action: "updated" | "status_changed" | "rsvp_changed";
+  detail: Record<string, unknown>;
+  actor: string | null;
+  actor_email: string | null;
+  actor_display_name: string | null;
+  actor_avatar_url: string | null;
+  created_at: string;
 }
 
 export interface RsvpUser {
@@ -255,6 +269,8 @@ export interface FullCalendarEvent {
   color?: string;
   backgroundColor?: string;
   borderColor?: string;
+  opacity?: number;
+  classNames?: string[];
   extendedProps: {
     creator: string;
     creator_email: string;
@@ -263,5 +279,7 @@ export interface FullCalendarEvent {
     description: string | null;
     category: string;
     is_template: boolean;
+    is_tombstone: boolean;
+    status: "confirmed" | "tentative";
   };
 }

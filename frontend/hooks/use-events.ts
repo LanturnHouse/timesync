@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
 import { getAccessToken } from "@/lib/auth";
-import type { Event, PaginatedResponse } from "@/types";
+import type { Event, EventLog, PaginatedResponse } from "@/types";
 
 function authHeaders() {
   const token = getAccessToken();
@@ -205,6 +205,29 @@ export function useScheduleSummary(period: "today" | "week" | "month") {
       ),
     staleTime: 3 * 60 * 1000, // 3분 캐시
     retry: false,
+  });
+}
+
+export function useEventLogs(eventId: string | null) {
+  return useQuery({
+    queryKey: ["events", eventId, "logs"],
+    queryFn: () => apiFetch<EventLog[]>(`/events/${eventId}/logs/`, authHeaders()),
+    enabled: !!eventId,
+  });
+}
+
+export function useChangeEventStatus() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ eventId, status }: { eventId: string; status: "confirmed" | "tentative" }) =>
+      apiFetch<Event>(`/events/${eventId}/change-status/`, {
+        method: "POST",
+        body: JSON.stringify({ status }),
+        ...authHeaders(),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["events"] });
+    },
   });
 }
 

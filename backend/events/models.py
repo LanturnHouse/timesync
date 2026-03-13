@@ -5,6 +5,10 @@ from common.models import TimeStampedModel
 
 
 class Event(TimeStampedModel):
+    class StatusChoices(models.TextChoices):
+        CONFIRMED = "confirmed", "Confirmed"
+        TENTATIVE = "tentative", "Tentative"
+
     creator = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -24,7 +28,16 @@ class Event(TimeStampedModel):
     category = models.CharField(max_length=50, blank=True, default="")
     color = models.CharField(max_length=7, blank=True, default="")
     is_template = models.BooleanField(default=False)
+    is_tombstone = models.BooleanField(default=False)  # recurring delete tombstone
     bg_image_url = models.TextField(blank=True, null=True)
+    # Event confirmation status (confirmed / tentative)
+    status = models.CharField(
+        max_length=10,
+        choices=StatusChoices.choices,
+        default=StatusChoices.CONFIRMED,
+    )
+    # Reminder: minutes before event to notify (None = no reminder)
+    reminder_minutes = models.IntegerField(null=True, blank=True)
 
     # --- Recurring event fields ---
     # RFC 5545 RRULE string (e.g. "FREQ=WEEKLY;INTERVAL=1")
@@ -46,6 +59,37 @@ class Event(TimeStampedModel):
 
     def __str__(self):
         return self.title
+
+
+class EventLog(TimeStampedModel):
+    """System-generated activity log for events."""
+
+    class ActionChoices(models.TextChoices):
+        UPDATED = "updated", "Updated"
+        STATUS_CHANGED = "status_changed", "Status Changed"
+        RSVP_CHANGED = "rsvp_changed", "RSVP Changed"
+
+    event = models.ForeignKey(
+        Event,
+        on_delete=models.CASCADE,
+        related_name="logs",
+    )
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="event_logs",
+    )
+    action = models.CharField(max_length=20, choices=ActionChoices.choices)
+    detail = models.JSONField(default=dict)
+
+    class Meta:
+        db_table = "event_logs"
+        ordering = ["created_at"]
+
+    def __str__(self):
+        return f"{self.action} on {self.event.title}"
 
 
 class EventRSVP(TimeStampedModel):

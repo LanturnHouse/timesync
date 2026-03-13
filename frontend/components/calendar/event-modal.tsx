@@ -58,6 +58,9 @@ import {
   useSaveAsTemplate,
   useRSVP,
   useAvailability,
+  useTemplates,
+  useCreateFromTemplate,
+  useChangeEventStatus,
 } from "@/hooks/use-events";
 import {
   Popover,
@@ -262,6 +265,15 @@ function FindTimePopover({
   );
 }
 
+const REMINDER_OPTIONS = [
+  { value: "5",    label: "5분 전" },
+  { value: "15",   label: "15분 전" },
+  { value: "30",   label: "30분 전" },
+  { value: "60",   label: "1시간 전" },
+  { value: "120",  label: "2시간 전" },
+  { value: "1440", label: "1일 전" },
+];
+
 /* eslint-disable @typescript-eslint/no-explicit-any */
 function EventFormFields({
   title,
@@ -287,6 +299,10 @@ function EventFormFields({
   conflicts,
   rrule,
   setRrule,
+  eventStatus,
+  setEventStatus,
+  reminderMinutes,
+  setReminderMinutes,
 }: {
   title: string;
   setTitle: (v: string) => void;
@@ -311,6 +327,10 @@ function EventFormFields({
   conflicts?: any[];
   rrule?: string;
   setRrule?: (v: string) => void;
+  eventStatus?: "confirmed" | "tentative";
+  setEventStatus?: (v: "confirmed" | "tentative") => void;
+  reminderMinutes?: string;
+  setReminderMinutes?: (v: string) => void;
 }) {
   return (
     <div className="grid gap-4 py-4">
@@ -538,6 +558,48 @@ function EventFormFields({
           )}
         </div>
       )}
+
+      {/* 일정 상태 (확정/미정) */}
+      {setEventStatus && (
+        <div className="grid gap-2">
+          <Label>일정 상태</Label>
+          <Select
+            value={eventStatus ?? "confirmed"}
+            onValueChange={(v) => setEventStatus(v as "confirmed" | "tentative")}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="confirmed">✓ 확정</SelectItem>
+              <SelectItem value="tentative">? 미정</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      {/* 알림 */}
+      {setReminderMinutes && (
+        <div className="grid gap-2">
+          <Label>알림</Label>
+          <Select
+            value={reminderMinutes ?? "none"}
+            onValueChange={(v) => setReminderMinutes(v === "none" ? "" : v)}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="알림 없음" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">알림 없음</SelectItem>
+              {REMINDER_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
     </div>
   );
 }
@@ -548,6 +610,7 @@ function EventDetailView({
   event,
   eventId,
   isCreator,
+  canChangeStatus,
   onEdit,
   onClose,
   onDelete,
@@ -555,10 +618,12 @@ function EventDetailView({
   rsvp,
   saveAsTemplate,
   deleteEvent,
+  changeStatus,
 }: {
   event: any;
   eventId: string;
   isCreator: boolean;
+  canChangeStatus: boolean;
   onEdit: () => void;
   onClose: () => void;
   onDelete: () => void;
@@ -566,6 +631,7 @@ function EventDetailView({
   rsvp: any;
   saveAsTemplate: any;
   deleteEvent: any;
+  changeStatus: any;
 }) {
   const startDate = event.start_at ? new Date(event.start_at) : null;
   const endDate   = event.end_at   ? new Date(event.end_at)   : null;
@@ -610,6 +676,50 @@ function EventDetailView({
             {event.title}
           </DialogTitle>
           <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+            {/* 일정 상태 뱃지 */}
+            {event.status === "tentative" ? (
+              canChangeStatus ? (
+                <button
+                  onClick={() =>
+                    changeStatus.mutate(
+                      { eventId, status: "confirmed" },
+                      {
+                        onSuccess: () => toast.success("일정이 확정되었습니다"),
+                        onError: (err: any) => toast.error(err.message),
+                      }
+                    )
+                  }
+                  disabled={changeStatus.isPending}
+                  className="inline-flex items-center gap-1 rounded-full border border-amber-400 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 hover:bg-amber-100 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-700"
+                >
+                  ? 미정 (클릭하여 확정)
+                </button>
+              ) : (
+                <span className="inline-flex items-center rounded-full border border-amber-400 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+                  ? 미정
+                </span>
+              )
+            ) : canChangeStatus ? (
+              <button
+                onClick={() =>
+                  changeStatus.mutate(
+                    { eventId, status: "tentative" },
+                    {
+                      onSuccess: () => toast.success("일정이 미정으로 변경되었습니다"),
+                      onError: (err: any) => toast.error(err.message),
+                    }
+                  )
+                }
+                disabled={changeStatus.isPending}
+                className="inline-flex items-center gap-1 rounded-full border border-emerald-400 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-700"
+              >
+                ✓ 확정 (클릭하여 미정으로)
+              </button>
+            ) : (
+              <span className="inline-flex items-center rounded-full border border-emerald-400 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                ✓ 확정
+              </span>
+            )}
             {event.category && (
               <Badge variant="secondary" className="text-xs font-normal">
                 {CATEGORY_LABELS[event.category] ?? event.category}
@@ -645,7 +755,7 @@ function EventDetailView({
       <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
 
         {/* ══ 상단: 이벤트 정보 (전체 너비) ══ */}
-        <div className="flex-[0_0_45%] border-b overflow-hidden">
+        <div className="flex-[0_0_50%] border-b overflow-hidden">
 
           {/* 이벤트 정보 (스크롤 가능) */}
           <div className="h-full overflow-y-auto p-6 flex flex-col gap-5">
@@ -678,87 +788,102 @@ function EventDetailView({
             {/* 구분선 */}
             <div className="h-px bg-border" />
 
-            {/* 참석 현황 */}
-            <div className="space-y-3">
+            {/* 참석 현황 & 내 응답 — 그룹 일정에만 표시 */}
+            {(event.group || (event.shared_to_groups?.length ?? 0) > 0) && <div className="space-y-2">
               <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">참석 현황</p>
               <div className="grid grid-cols-3 gap-2">
                 {(
                   [
-                    { count: accepted,  users: event.rsvp_details?.accepted  ?? [], label: "수락", numColor: "text-emerald-500" },
-                    { count: tentative, users: event.rsvp_details?.tentative ?? [], label: "미정", numColor: "text-amber-500"   },
-                    { count: declined,  users: event.rsvp_details?.declined  ?? [], label: "불가", numColor: "text-red-500"     },
-                  ] as { count: number; users: RsvpUser[]; label: string; numColor: string }[]
-                ).map(({ count, users, label, numColor }) => (
-                  <Popover key={label}>
-                    <PopoverTrigger asChild>
-                      <button
-                        className="w-full flex flex-col items-center gap-0.5 rounded-xl border bg-background py-2.5 transition-colors hover:bg-muted disabled:opacity-50 disabled:cursor-default"
-                        disabled={count === 0}
-                      >
-                        <span className={`text-2xl font-bold tabular-nums leading-none ${numColor}`}>{count}</span>
-                        <span className="text-xs text-muted-foreground mt-1">{label}</span>
-                      </button>
-                    </PopoverTrigger>
-                    {count > 0 && (
-                      <PopoverContent className="w-56 p-2" align="start">
-                        <p className="text-xs font-semibold text-muted-foreground px-2 py-1 mb-1">{label} ({count}명)</p>
-                        <div className="space-y-1">
-                          {users.map((u) => (
-                            <div key={u.id} className="flex items-center gap-2 px-2 py-1 rounded-md hover:bg-muted">
-                              <Avatar className="h-6 w-6 shrink-0">
-                                <AvatarImage src={u.avatar_url ?? undefined} />
-                                <AvatarFallback className="text-[10px]">
-                                  {(u.display_name || u.email).charAt(0).toUpperCase()}
-                                </AvatarFallback>
-                              </Avatar>
-                              <span className="text-xs truncate">
-                                {u.display_name || u.email}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </PopoverContent>
-                    )}
-                  </Popover>
-                ))}
-              </div>
-            </div>
-
-            {/* 내 응답 */}
-            <div className="space-y-3">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">내 응답</p>
-              <div className="grid grid-cols-3 gap-2">
-                {(
-                  [
-                    { status: "accepted",  label: "✓ 참여", sel: "bg-emerald-500 hover:bg-emerald-600 text-white border-emerald-500" },
-                    { status: "tentative", label: "? 미정", sel: "bg-amber-500   hover:bg-amber-600   text-white border-amber-500"   },
-                    { status: "declined",  label: "✗ 불가", sel: "bg-red-500     hover:bg-red-600     text-white border-red-500"     },
-                  ] as const
-                ).map(({ status, label, sel }) => {
+                    {
+                      status: "accepted"  as const,
+                      count: accepted,
+                      users: event.rsvp_details?.accepted  ?? [],
+                      label: "수락",
+                      actionLabel: "✓ 참여",
+                      numColor: "text-emerald-500",
+                      selClass: "bg-emerald-500 hover:bg-emerald-600 text-white",
+                    },
+                    {
+                      status: "tentative" as const,
+                      count: tentative,
+                      users: event.rsvp_details?.tentative ?? [],
+                      label: "미정",
+                      actionLabel: "? 미정",
+                      numColor: "text-amber-500",
+                      selClass: "bg-amber-500 hover:bg-amber-600 text-white",
+                    },
+                    {
+                      status: "declined"  as const,
+                      count: declined,
+                      users: event.rsvp_details?.declined  ?? [],
+                      label: "불가",
+                      actionLabel: "✗ 불가",
+                      numColor: "text-red-500",
+                      selClass: "bg-red-500 hover:bg-red-600 text-white",
+                    },
+                  ]
+                ).map(({ status, count, users, label, actionLabel, numColor, selClass }) => {
                   const isCurrent = event.my_rsvp_status === status;
                   return (
-                    <Button
-                      key={status}
-                      variant={isCurrent ? "default" : "outline"}
-                      size="sm"
-                      className={`text-xs font-medium ${isCurrent ? sel : "text-muted-foreground hover:text-foreground"}`}
-                      disabled={rsvp.isPending}
-                      onClick={() =>
-                        rsvp.mutate(
-                          { eventId, status: isCurrent ? null : status },
-                          {
-                            onSuccess: () => toast.success(isCurrent ? "응답이 취소되었습니다" : `${label.slice(2)}로 응답했습니다`),
-                            onError: (err: any) => toast.error(err.message),
-                          }
-                        )
-                      }
-                    >
-                      {label}
-                    </Button>
+                    <div key={status} className="rounded-xl border overflow-hidden">
+                      {/* 상단: 참석 현황 카운트 (클릭 → 팝오버) */}
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <button
+                            className="w-full flex flex-col items-center gap-0.5 bg-background py-2.5 transition-colors hover:bg-muted disabled:opacity-50 disabled:cursor-default"
+                            disabled={count === 0}
+                          >
+                            <span className={`text-2xl font-bold tabular-nums leading-none ${numColor}`}>{count}</span>
+                            <span className="text-xs text-muted-foreground mt-0.5">{label}</span>
+                          </button>
+                        </PopoverTrigger>
+                        {count > 0 && (
+                          <PopoverContent className="w-56 p-2" align="start">
+                            <p className="text-xs font-semibold text-muted-foreground px-2 py-1 mb-1">{label} ({count}명)</p>
+                            <div className="space-y-1">
+                              {(users as RsvpUser[]).map((u) => (
+                                <div key={u.id} className="flex items-center gap-2 px-2 py-1 rounded-md hover:bg-muted">
+                                  <Avatar className="h-6 w-6 shrink-0">
+                                    <AvatarImage src={u.avatar_url ?? undefined} />
+                                    <AvatarFallback className="text-[10px]">
+                                      {(u.display_name || u.email).charAt(0).toUpperCase()}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <span className="text-xs truncate">{u.display_name || u.email}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </PopoverContent>
+                        )}
+                      </Popover>
+                      {/* 구분선 */}
+                      <div className="h-px bg-border" />
+                      {/* 하단: 내 응답 버튼 */}
+                      <button
+                        className={[
+                          "w-full py-1.5 text-xs font-medium transition-colors",
+                          isCurrent
+                            ? selClass
+                            : "bg-background text-muted-foreground hover:bg-muted hover:text-foreground",
+                        ].join(" ")}
+                        disabled={rsvp.isPending}
+                        onClick={() =>
+                          rsvp.mutate(
+                            { eventId, status: isCurrent ? null : status },
+                            {
+                              onSuccess: () => toast.success(isCurrent ? "응답이 취소되었습니다" : `${actionLabel.slice(2)}로 응답했습니다`),
+                              onError: (err: any) => toast.error(err.message),
+                            }
+                          )
+                        }
+                      >
+                        {actionLabel}
+                      </button>
+                    </div>
                   );
                 })}
               </div>
-            </div>
+            </div>}
 
             {/* 관리 (creator only) */}
             {isCreator && (
@@ -834,9 +959,13 @@ export function EventModal({
   const hasExistingEvent = !!eventId;
   const [mode, setMode] = useState<ModalMode>(hasExistingEvent ? "view" : "create");
 
-  const { data: existingEvent } = useEvent(eventId ?? null);
+  // Virtual recurring IDs have format "masterUUID__iso_dt" — extract the real UUID
+  const masterEventId = eventId?.includes("__") ? eventId.split("__")[0] : eventId;
+
+  const { data: existingEvent, isLoading: isEventLoading } = useEvent(masterEventId ?? null);
   const { data: groupsData } = useGroups();
   const groups = groupsData?.results ?? [];
+  const { data: templates } = useTemplates();
 
   const { user } = useAuth();
   const createEvent = useCreateEvent();
@@ -844,11 +973,24 @@ export function EventModal({
   const deleteEvent = useDeleteEvent();
   const shareEvent = useShareEvent();
   const saveAsTemplate = useSaveAsTemplate();
+  const createFromTemplate = useCreateFromTemplate();
   const rsvp = useRSVP();
-  const { data: reminders } = useReminders(eventId ?? null);
+  const changeStatus = useChangeEventStatus();
+  const { data: reminders } = useReminders(masterEventId ?? null);
   const createReminder = useCreateReminder();
   const deleteReminder = useDeleteReminder();
   const isCreator = existingEvent?.creator === user?.id;
+
+  // Can change status: creator OR group admin/editor
+  const myGroupRole = existingEvent?.group
+    ? groups.find((g) => g.id === existingEvent.group)?.members?.find(
+        (m: { user: string; role: string }) => m.user === user?.id
+      )?.role
+    : null;
+  const canChangeStatus =
+    isCreator ||
+    myGroupRole === "admin" ||
+    myGroupRole === "editor";
 
   const [title, setTitle] = useState("");
   const [startAt, setStartAt] = useState("");
@@ -858,6 +1000,8 @@ export function EventModal({
   const [color, setColor] = useState("");
   const [groupId, setGroupId] = useState<string>("");
   const [rrule, setRrule] = useState("");
+  const [eventStatus, setEventStatus] = useState<"confirmed" | "tentative">("confirmed");
+  const [reminderMinutes, setReminderMinutes] = useState<string>("");
 
   const [recurrenceDialog, setRecurrenceDialog] = useState<{
     open: boolean;
@@ -891,6 +1035,8 @@ export function EventModal({
       setColor(existingEvent.color);
       setGroupId(existingEvent.group ?? "");
       setRrule(existingEvent.rrule ?? "");
+      setEventStatus(existingEvent.status ?? "confirmed");
+      setReminderMinutes(existingEvent.reminder_minutes ? String(existingEvent.reminder_minutes) : "");
     } else if (mode === "create") {
       setTitle("");
       setStartAt(defaultStart ? toLocalDatetime(defaultStart) : "");
@@ -900,6 +1046,8 @@ export function EventModal({
       setColor("");
       setGroupId("");
       setRrule("");
+      setEventStatus("confirmed");
+      setReminderMinutes("");
     }
   }, [existingEvent, mode, defaultStart, defaultEnd]);
 
@@ -922,6 +1070,8 @@ export function EventModal({
       color,
       group: groupId || null,
       rrule: rrule || "",
+      status: eventStatus,
+      reminder_minutes: reminderMinutes ? Number(reminderMinutes) : null,
     };
 
     if (mode === "edit") {
@@ -1011,6 +1161,19 @@ export function EventModal({
   const isPending =
     createEvent.isPending || updateEvent.isPending || deleteEvent.isPending;
 
+  // ── VIEW mode (loading) ──────────────────────────────────────────────────
+  if (open && mode === "view" && hasExistingEvent && isEventLoading) {
+    return (
+      <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+        <DialogContent className="sm:max-w-[520px]">
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   // ── VIEW mode ────────────────────────────────────────────────────────────
   if (open && mode === "view" && existingEvent) {
     return (
@@ -1018,13 +1181,14 @@ export function EventModal({
         <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
           <EventDetailView
             event={existingEvent}
-            eventId={eventId!}
+            eventId={masterEventId!}
             isCreator={isCreator}
+            canChangeStatus={canChangeStatus}
             onEdit={() => setMode("edit")}
             onClose={onClose}
             onDelete={handleDelete}
             onSaveTemplate={() =>
-              saveAsTemplate.mutate(eventId!, {
+              saveAsTemplate.mutate(masterEventId!, {
                 onSuccess: () => toast.success("템플릿으로 저장되었습니다"),
                 onError: (err) => toast.error(err.message),
               })
@@ -1032,6 +1196,7 @@ export function EventModal({
             rsvp={rsvp}
             saveAsTemplate={saveAsTemplate}
             deleteEvent={deleteEvent}
+            changeStatus={changeStatus}
           />
         </Dialog>
         <RecurrenceDialog
@@ -1047,23 +1212,67 @@ export function EventModal({
   // ── EDIT / CREATE mode ───────────────────────────────────────────────────
   const isEditMode = mode === "edit";
 
+  // If we have an existing event ID but are not yet in edit mode, show a spinner
+  // (prevents the create form from briefly flashing before the view mode kicks in,
+  //  and also handles the fetch-error case gracefully)
+  if (hasExistingEvent && !isEditMode) {
+    return (
+      <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+        <DialogContent className="sm:max-w-[520px]">
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   return (
     <>
       <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
         <DialogContent className="sm:max-w-[520px]">
           <DialogHeader>
-            <div className="flex items-center gap-2">
-              {isEditMode && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 -ml-1"
-                  onClick={() => setMode("view")}
+            <div className="flex items-center gap-2 justify-between">
+              <div className="flex items-center gap-2">
+                {isEditMode && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 -ml-1"
+                    onClick={() => setMode("view")}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                )}
+                <DialogTitle>{isEditMode ? "이벤트 편집" : "이벤트 만들기"}</DialogTitle>
+              </div>
+              {/* 템플릿 선택 (생성 모드에서만) */}
+              {!isEditMode && templates && templates.length > 0 && (
+                <Select
+                  value=""
+                  onValueChange={(templateId) => {
+                    const tpl = templates.find((t) => t.id === templateId);
+                    if (!tpl) return;
+                    setTitle(tpl.title.replace(" (Template)", ""));
+                    setDescription(tpl.description ?? "");
+                    setCategory(tpl.category ?? "");
+                    setColor(tpl.color ?? "");
+                    setGroupId(tpl.group ?? "");
+                    toast.success(`"${tpl.title.replace(" (Template)", "")}" 템플릿이 적용되었습니다`);
+                  }}
                 >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
+                  <SelectTrigger className="h-7 w-36 text-xs">
+                    <SelectValue placeholder="템플릿 선택" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {templates.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>
+                        {t.title.replace(" (Template)", "")}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               )}
-              <DialogTitle>{isEditMode ? "이벤트 편집" : "이벤트 만들기"}</DialogTitle>
             </div>
           </DialogHeader>
 
@@ -1086,88 +1295,16 @@ export function EventModal({
             isEditing={isEditMode}
             isCreator={isCreator}
             existingEvent={existingEvent}
-            eventId={eventId}
+            eventId={masterEventId}
             shareEvent={shareEvent}
             conflicts={conflicts}
             rrule={rrule}
             setRrule={setRrule}
+            eventStatus={eventStatus}
+            setEventStatus={setEventStatus}
+            reminderMinutes={reminderMinutes}
+            setReminderMinutes={setReminderMinutes}
           />
-
-          {/* Reminders (edit mode only) */}
-          {isEditMode && (
-            <div className="space-y-2 border-t pt-4">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-medium">알림</p>
-                <Select
-                  value=""
-                  onValueChange={(val) => {
-                    if (!val || !eventId) return;
-                    createReminder.mutate(
-                      { eventId, remindBeforeMinutes: Number(val) },
-                      {
-                        onSuccess: () => toast.success("알림이 추가되었습니다"),
-                        onError: (err) => toast.error(err.message),
-                      }
-                    );
-                  }}
-                >
-                  <SelectTrigger className="h-7 w-36 text-xs">
-                    <SelectValue placeholder="알림 추가" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {[
-                      { value: "5", label: "5분 전" },
-                      { value: "15", label: "15분 전" },
-                      { value: "30", label: "30분 전" },
-                      { value: "60", label: "1시간 전" },
-                      { value: "120", label: "2시간 전" },
-                      { value: "1440", label: "1일 전" },
-                    ].map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              {reminders && reminders.length > 0 ? (
-                <div className="flex flex-wrap gap-1.5">
-                  {reminders.map((r) => (
-                    <Badge
-                      key={r.id}
-                      variant="secondary"
-                      className="flex items-center gap-1 pr-1"
-                    >
-                      <Clock className="h-3 w-3" />
-                      {r.remind_before_minutes < 60
-                        ? `${r.remind_before_minutes}분`
-                        : r.remind_before_minutes === 60
-                        ? "1시간"
-                        : r.remind_before_minutes === 120
-                        ? "2시간"
-                        : "1일"}
-                      <button
-                        className="ml-0.5 rounded-full hover:text-destructive"
-                        onClick={() =>
-                          deleteReminder.mutate(
-                            { reminderId: r.id, eventId: eventId! },
-                            {
-                              onSuccess: () => toast.success("알림이 삭제되었습니다"),
-                              onError: (err) => toast.error(err.message),
-                            }
-                          )
-                        }
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </Badge>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-xs text-muted-foreground">설정된 알림이 없습니다.</p>
-              )}
-            </div>
-          )}
 
           <DialogFooter className="flex justify-between">
             <div className="flex gap-2 ml-auto">

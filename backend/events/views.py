@@ -14,7 +14,7 @@ from groups.models import GroupMember
 from notifications.utils import notify
 from .filters import EventFilter
 from .ical import build_calendar
-from .models import Event, EventRSVP, EventShare
+from .models import Event, EventLog, EventRSVP, EventShare
 from .permissions import IsEventOwnerOrGroupAdmin
 from .serializers import (
     CalendarEventSerializer,
@@ -65,6 +65,23 @@ class EventViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(creator=self.request.user)
 
+    def perform_update(self, serializer):
+        instance = serializer.instance
+        # Track changed fields before save
+        changed_fields = [
+            k for k, v in serializer.validated_data.items()
+            if k not in ("recurrence_scope", "recurrence_id")
+            and getattr(instance, k, None) != v
+        ]
+        serializer.save()
+        if changed_fields:
+            EventLog.objects.create(
+                event=serializer.instance,
+                actor=self.request.user,
+                action=EventLog.ActionChoices.UPDATED,
+                detail={"fields": changed_fields},
+            )
+
     def _get_master_and_occurrence_dt(self, event_id: str):
         """
         Parse a virtual recurring event id (``master_id__iso_dt``) or a real id.
@@ -108,9 +125,17 @@ class EventViewSet(viewsets.ModelViewSet):
             # Don't overwrite recurrence_scope / recurrence_id fields
             data = {k: v for k, v in serializer.validated_data.items()
                     if k not in ("recurrence_scope", "recurrence_id", "parent_event")}
+            changed_fields = [k for k in data if getattr(master, k, None) != data[k]]
             for attr, value in data.items():
                 setattr(master, attr, value)
             master.save()
+            if changed_fields:
+                EventLog.objects.create(
+                    event=master,
+                    actor=request.user,
+                    action=EventLog.ActionChoices.UPDATED,
+                    detail={"fields": changed_fields},
+                )
             return Response(EventSerializer(master, context={"request": request}).data)
 
         if not recurrence_id_str:
@@ -216,7 +241,7 @@ class EventViewSet(viewsets.ModelViewSet):
             occurrence_dt = tz.make_aware(occurrence_dt)
 
         if scope == "this":
-            # Create a cancellation exception (same as 'this' edit but no data change)
+            # Create a cancellation exception (tombstone marker)
             Event.objects.create(
                 creator=master.creator,
                 group=master.group,
@@ -225,7 +250,7 @@ class EventViewSet(viewsets.ModelViewSet):
                 end_at=occurrence_dt + (master.end_at - master.start_at),
                 recurrence_id=occurrence_dt,
                 parent_event=master,
-                is_template=True,  # Use is_template as a tombstone flag
+                is_tombstone=True,  # Separate tombstone flag, not is_template
             )
             return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -249,20 +274,62 @@ class EventViewSet(viewsets.ModelViewSet):
     def calendar(self, request):
         """Non-paginated endpoint for FullCalendar date range queries.
         Also expands recurring master events into virtual occurrences.
+
+        Uses OVERLAP semantics: returns events whose time range intersects
+        with [start_after, end_before), so overflow days in month view
+        (e.g. March 30-31 visible in April) are correctly included.
+        Accepts both full ISO datetime strings and date-only strings.
         """
-        queryset = self.filter_queryset(self.get_queryset())
+        from django.utils.dateparse import parse_datetime, parse_date
+        from datetime import datetime, time as dt_time
+
+        queryset = self.get_queryset()
+
+        # Apply non-date filters manually (category, search)
+        category = request.query_params.get("category")
+        search_q = request.query_params.get("search")
+        if category:
+            queryset = queryset.filter(category=category)
+        if search_q:
+            queryset = queryset.filter(
+                models.Q(title__icontains=search_q)
+                | models.Q(description__icontains=search_q)
+            )
+
+        # Exclude templates and tombstones from calendar view
+        queryset = queryset.filter(is_template=False, is_tombstone=False)
+
+        start_str = request.query_params.get("start_after", "")
+        end_str = request.query_params.get("end_before", "")
+
+        def parse_flexible(s: str):
+            """Parse an ISO datetime or date-only string to an aware datetime."""
+            dt = parse_datetime(s)
+            if dt is not None:
+                return dt if timezone.is_aware(dt) else timezone.make_aware(dt)
+            d = parse_date(s)
+            if d is not None:
+                return timezone.make_aware(datetime.combine(d, dt_time.min))
+            return None
+
+        range_start = parse_flexible(start_str) if start_str else None
+        range_end = parse_flexible(end_str) if end_str else None
+
+        # Overlap filter: event overlaps the range iff
+        #   event.start_at < range_end  AND  event.end_at > range_start
+        if range_start:
+            queryset = queryset.filter(end_at__gt=range_start)
+        if range_end:
+            queryset = queryset.filter(start_at__lt=range_end)
 
         # Separate non-recurring events from recurring masters
         regular = queryset.filter(rrule="", parent_event__isnull=True)
         recurring_masters = queryset.filter(rrule__gt="", parent_event__isnull=True)
-        # Exception instances (child events)
+        # Exception instances (child events, excluding tombstones)
         exception_instances = queryset.filter(parent_event__isnull=False)
 
         data = list(CalendarEventSerializer(regular, many=True).data)
         data += list(CalendarEventSerializer(exception_instances, many=True).data)
-
-        start_str = request.query_params.get("start_after", "")
-        end_str = request.query_params.get("end_before", "")
 
         for master in recurring_masters.prefetch_related("exceptions"):
             if start_str and end_str:
@@ -370,9 +437,9 @@ class EventViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["get"])
     def templates(self, request):
-        """List templates owned by the current user."""
+        """List templates owned by the current user (excludes tombstones)."""
         queryset = Event.objects.filter(
-            creator=request.user, is_template=True
+            creator=request.user, is_template=True, is_tombstone=False
         ).select_related("creator", "group").order_by("-created_at")
         serializer = EventSerializer(queryset, many=True)
         return Response(serializer.data)
@@ -496,6 +563,12 @@ class EventViewSet(viewsets.ModelViewSet):
 
         if request.method == "DELETE":
             EventRSVP.objects.filter(event=event, user=request.user).delete()
+            EventLog.objects.create(
+                event=event,
+                actor=request.user,
+                action=EventLog.ActionChoices.RSVP_CHANGED,
+                detail={"status": None},
+            )
             return Response(status=status.HTTP_204_NO_CONTENT)
 
         # POST
@@ -510,6 +583,14 @@ class EventViewSet(viewsets.ModelViewSet):
             event=event,
             user=request.user,
             defaults={"status": status_val},
+        )
+
+        # Log the RSVP change
+        EventLog.objects.create(
+            event=event,
+            actor=request.user,
+            action=EventLog.ActionChoices.RSVP_CHANGED,
+            detail={"status": status_val},
         )
 
         # Notify event creator (not if they RSVP their own event)
@@ -527,6 +608,61 @@ class EventViewSet(viewsets.ModelViewSet):
             serializer.data,
             status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
         )
+
+    @action(detail=True, methods=["post"], url_path="change-status")
+    def change_status(self, request, pk=None):
+        """
+        Change event confirmation status (confirmed / tentative).
+        - Personal events: creator only
+        - Group events: creator, admin, or editor
+        """
+        event = self.get_object()
+        new_status = request.data.get("status")
+        if new_status not in Event.StatusChoices.values:
+            return Response(
+                {"detail": f"status must be one of: {', '.join(Event.StatusChoices.values)}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Permission check
+        is_creator = event.creator == request.user
+        if not is_creator:
+            if event.group_id:
+                member = GroupMember.objects.filter(
+                    group_id=event.group_id, user=request.user
+                ).first()
+                if not member or member.role not in ("admin", "editor"):
+                    return Response(
+                        {"detail": "Only admin or editor can change group event status."},
+                        status=status.HTTP_403_FORBIDDEN,
+                    )
+            else:
+                return Response(
+                    {"detail": "Only the creator can change personal event status."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
+        old_status = event.status
+        event.status = new_status
+        event.save(update_fields=["status"])
+
+        EventLog.objects.create(
+            event=event,
+            actor=request.user,
+            action=EventLog.ActionChoices.STATUS_CHANGED,
+            detail={"from": old_status, "to": new_status},
+        )
+
+        return Response(EventSerializer(event, context={"request": request}).data)
+
+    @action(detail=True, methods=["get"])
+    def logs(self, request, pk=None):
+        """Return activity logs for an event."""
+        event = self.get_object()
+        from .serializers import EventLogSerializer
+        qs = event.logs.select_related("actor").order_by("created_at")
+        serializer = EventLogSerializer(qs, many=True)
+        return Response(serializer.data)
 
     @action(detail=False, methods=["get"])
     def summary(self, request):
