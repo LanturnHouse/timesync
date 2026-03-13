@@ -92,7 +92,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Category filter — 모바일에서 가로 스크롤 */}
-        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none max-w-full pb-0.5">
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none max-w-full">
           {CATEGORIES.map((cat) => (
             <button
               key={cat.value}

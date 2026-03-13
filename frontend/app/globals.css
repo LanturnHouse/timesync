@@ -6,6 +6,14 @@
   .text-balance {
     text-wrap: balance;
   }
+  /* 스크롤바 숨김 (크로스 브라우저) */
+  .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 /* FullCalendar theme overrides */
