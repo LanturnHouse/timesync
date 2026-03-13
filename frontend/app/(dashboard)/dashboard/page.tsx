@@ -115,22 +115,6 @@ export default function DashboardPage() {
           ))}
         </div>
 
-        {/* AI 요약 + Export */}
-        <div className="ml-auto flex items-center gap-1.5 sm:gap-2 shrink-0">
-          <AiSummaryPopover />
-          {/* 모바일: 아이콘만, sm 이상: 텍스트 포함 */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() =>
-              downloadAllIcal().catch((err) => toast.error(err.message))
-            }
-            title="Export All (.ics)"
-          >
-            <Download className="h-3.5 w-3.5 sm:mr-1.5" />
-            <span className="hidden sm:inline">Export All (.ics)</span>
-          </Button>
-        </div>
       </div>
 
       <div className="flex-1 min-h-0 overflow-auto">
@@ -139,6 +123,20 @@ export default function DashboardPage() {
           onEventClick={handleEventClick}
           categoryFilter={categoryFilter || undefined}
           search={debouncedSearch || undefined}
+          headerActions={
+            <>
+              <AiSummaryPopover />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => downloadAllIcal().catch((err) => toast.error(err.message))}
+                title="Export All (.ics)"
+              >
+                <Download className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline ml-1.5">Export (.ics)</span>
+              </Button>
+            </>
+          }
         />
       </div>
       <EventModal

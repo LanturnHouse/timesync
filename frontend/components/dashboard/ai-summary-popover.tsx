@@ -50,7 +50,7 @@ export function AiSummaryPopover() {
       <PopoverTrigger asChild>
         <Button variant="outline" size="sm" className="gap-1.5">
           <Sparkles className="h-3.5 w-3.5" />
-          일정 요약
+          <span className="hidden sm:inline">일정 요약</span>
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-80 p-4" align="end">
