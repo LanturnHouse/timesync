@@ -7,7 +7,7 @@ import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
 import listPlugin from "@fullcalendar/list";
 import type { DateSelectArg, DatesSetArg, EventClickArg, EventDropArg } from "@fullcalendar/core";
-import type { EventResizeDoneArg } from "@fullcalendar/interaction";
+import type { DateClickArg, EventResizeDoneArg } from "@fullcalendar/interaction";
 import { useCalendarEvents, useUpdateEvent } from "@/hooks/use-events";
 import { toFullCalendarEvents } from "@/lib/calendar-utils";
 import { toast } from "sonner";
@@ -55,6 +55,16 @@ export function CalendarView({
   const handleDateSelect = useCallback(
     (selectInfo: DateSelectArg) => {
       onDateSelect?.(selectInfo.startStr, selectInfo.endStr);
+    },
+    [onDateSelect]
+  );
+
+  const handleDateClick = useCallback(
+    (clickInfo: DateClickArg) => {
+      // Mobile tap (and desktop single-click) — open create modal with 1-hour default
+      const start = clickInfo.date;
+      const end = new Date(start.getTime() + 60 * 60 * 1000);
+      onDateSelect?.(start.toISOString(), end.toISOString());
     },
     [onDateSelect]
   );
@@ -130,6 +140,8 @@ export function CalendarView({
         dayMaxEvents={true}
         datesSet={handleDatesSet}
         select={handleDateSelect}
+        dateClick={handleDateClick}
+        longPressDelay={300}
         eventClick={handleEventClick}
         eventDrop={handleEventDrop}
         eventResize={handleEventResize}
